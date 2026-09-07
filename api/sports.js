@@ -128,8 +128,8 @@ export default async function handler(req, res) {
   if (enrichedGames.some((game) => STANDINGS_LEAGUES.has(game.leagueId))) {
     try {
       const result = await enrichGamesWithEspnStandings(enrichedGames, today.getUTCFullYear());
-      enrichedGames = result.games;
-      diagnostics.standings.push(...result.diagnostics.map((item) => sourceRecord(`espn-${item.leagueId}`, `${item.leagueId.toUpperCase()} standings`, item.provider, 'ok', item.count, null, item.durationMs, item.cached)));
+      enrichedGames = result;
+      diagnostics.standings.push(...(result.diagnostics ?? []).map((item) => sourceRecord(`espn-${item.leagueId}`, `${item.leagueId.toUpperCase()} standings`, item.provider, 'ok', item.count, null, item.durationMs, item.cached)));
     } catch (error) {
       diagnostics.standings.push(sourceRecord('espn-major-sports', 'Major sports standings', 'ESPN standings', 'error', 0, errorMessage(error)));
     }
