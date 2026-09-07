@@ -28,6 +28,13 @@ function addDays(date, days) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 }
 
+function getLocalDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function isWithinRange(game, start, endExclusive) {
   const time = new Date(game.startTime).getTime();
   return time >= start.getTime() && time < endExclusive.getTime();
@@ -69,7 +76,18 @@ function compareForDisplay(a, b) {
     return liveDifference;
   }
 
-  return sortGamesByPriority([a, b])[0] === a ? -1 : 1;
+  const priorityOrder = sortGamesByPriority([a, b]);
+  const firstId = priorityOrder[0]?.id;
+
+  if (firstId === a.id && firstId !== b.id) {
+    return -1;
+  }
+
+  if (firstId === b.id && firstId !== a.id) {
+    return 1;
+  }
+
+  return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
 }
 
 /**
@@ -86,8 +104,9 @@ export function getGamesForDate(games, date) {
 }
 
 /**
- * Returns the complete My Games window: today plus the next seven days.
- * This is eight calendar dates total, including today.
+ * Returns games in today's calendar date plus the following seven dates.
+ * The selector intentionally keeps the full eight-day window independent of
+ * UI concerns so the same result can power list, calendar, or future widgets.
  */
 export function getMyGamesWindow(games, now = new Date()) {
   const start = startOfDay(now);
@@ -100,21 +119,21 @@ export function getMyGamesWindow(games, now = new Date()) {
 }
 
 /**
- * Keeps every favorite game, then allows at most three non-favorite major
- * games/UCL games into the My Games window. The three slots are selected by
- * the existing priority engine, then by start time.
+ * Builds the actual My Games set.
+ *
+ * Every favorite-team game is retained. Non-favorite major games are capped
+ * at three across the eight-day window, selected by the priority engine.
  */
 export function getMyGames(games, now = new Date()) {
   const windowGames = getMyGamesWindow(games, now);
   const favoriteGames = windowGames.filter(isFavoriteGame);
-  const mustSeeGames = windowGames.filter(isMustSeeGame);
   const nonFavoriteCandidates = windowGames.filter(
     (game) => isNonFavoriteMajor(game) || isNonFavoriteMajorUcl(game),
   );
 
   const selectedNonFavorites = sortGamesByPriority(nonFavoriteCandidates).slice(0, 3);
   const selectedIds = new Set(
-    [...favoriteGames, ...mustSeeGames, ...selectedNonFavorites].map((game) => game.id),
+    [...favoriteGames, ...selectedNonFavorites].map((game) => game.id),
   );
 
   return windowGames
@@ -122,30 +141,34 @@ export function getMyGames(games, now = new Date()) {
     .sort(compareForDisplay);
 }
 
+/**
+ * Returns today's portion of My Games. Live games still rise to the top.
+ */
 export function getTodayMyGames(games, now = new Date()) {
-  const today = startOfDay(now);
-  return getMyGames(games, now).filter((game) => {
-    const start = startOfDay(new Date(game.startTime));
-    return start.getTime() === today.getTime();
-  });
+  const todayKey = getLocalDateKey(now);
+
+  return getMyGames(games, now).filter(
+    (game) => getLocalDateKey(new Date(game.startTime)) === todayKey,
+  );
 }
 
+/**
+ * Returns My Games across the complete today-plus-seven-days window.
+ * This is intentionally an alias-style selector for consumers that care about
+ * upcoming calendar content rather than the historical name "window".
+ */
 export function getUpcomingMyGames(games, now = new Date()) {
-  const today = startOfDay(now);
-  const endExclusive = addDays(today, 8);
-
-  return getMyGames(games, now).filter((game) => {
-    const gameTime = new Date(game.startTime).getTime();
-    return gameTime >= today.getTime() && gameTime < endExclusive.getTime();
-  });
+  return getMyGames(games, now);
 }
 
+/**
+ * Groups My Games by local calendar date for a future UI to render sections.
+ */
 export function groupMyGamesByDate(games, now = new Date()) {
   const grouped = new Map();
 
   for (const game of getMyGames(games, now)) {
-    const date = startOfDay(new Date(game.startTime));
-    const key = date.toISOString().slice(0, 10);
+    const key = getLocalDateKey(new Date(game.startTime));
 
     if (!grouped.has(key)) {
       grouped.set(key, []);
