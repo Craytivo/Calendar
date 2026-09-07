@@ -9,6 +9,7 @@ import { GameDetailModal } from './components/GameDetailModal.jsx';
 import { MyGamesView } from './components/MyGamesView.jsx';
 import { ViewSwitcher } from './components/ViewSwitcher.jsx';
 import './styles.css';
+import './styles-polish.css';
 
 const favoriteTeamIds = new Set(['sac-kings', 'oregon-ducks', 'real-madrid', 'tottenham', 'blue-jays', 'dodgers', 'oilers', 'vikings']);
 const viewerTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
