@@ -7,6 +7,7 @@ import {
 } from './priority.js';
 
 const MY_GAMES_WINDOW_DAYS = 7;
+const MY_GAMES_SECTION_LIMIT = 5;
 
 const favoriteTeamIds = new Set(
   teams.filter((team) => team.favorite).map((team) => team.id),
@@ -58,6 +59,10 @@ function isMajorEvent(game) {
   );
 }
 
+function isLive(game) {
+  return game.status === 'live';
+}
+
 function isDisplayableMyGame(game) {
   return (
     isFavoriteGame(game) ||
@@ -65,23 +70,9 @@ function isDisplayableMyGame(game) {
     isMajorEvent(game) ||
     isMajorGameForPriority(game) ||
     isMajorUclGameForPriority(game) ||
+    (game.leagueId === 'nfl' && game.eventType !== 'preseason') ||
     (game.leagueId === 'ufc' && game.eventType === 'main-card')
   );
-}
-
-function isLive(game) {
-  return game.status === 'live';
-}
-
-function isNonFavoriteMajor(game) {
-  return !isFavoriteGame(game) && (
-    isMajorEvent(game) ||
-    isMajorGameForPriority(game)
-  );
-}
-
-function isNonFavoriteMajorUcl(game) {
-  return !isFavoriteGame(game) && isMajorUclGameForPriority(game);
 }
 
 function compareForDisplay(a, b) {
@@ -115,7 +106,9 @@ export function getGamesForDate(games, date) {
 }
 
 /**
- * Returns games from today through the next six calendar dates: seven dates total.
+ * Returns the seven-date My Games scope: today through the next six calendar dates.
+ * Category scope is determined by isDisplayableMyGame; UI sections decide how many
+ * of those scoped games to surface.
  */
 export function getMyGamesWindow(games, now = new Date()) {
   const start = startOfDay(now);
@@ -128,46 +121,43 @@ export function getMyGamesWindow(games, now = new Date()) {
 }
 
 /**
- * Builds the actual My Games set. Every favorite-team game is retained.
- * Non-favorite major events/games are capped at three per calendar day.
+ * Returns the complete seven-day scoped set. No artificial daily cap is applied here.
+ * This keeps the source-of-truth scope intact so the Today and Next 7 Days sections
+ * can independently take their top five.
  */
 export function getMyGames(games, now = new Date()) {
-  const windowGames = getMyGamesWindow(games, now);
-  const byDate = new Map();
-
-  for (const game of windowGames) {
-    const key = getLocalDateKey(new Date(game.startTime));
-    if (!byDate.has(key)) byDate.set(key, []);
-    byDate.get(key).push(game);
-  }
-
-  const selected = [];
-
-  for (const dayGames of byDate.values()) {
-    const favorites = dayGames.filter(isFavoriteGame);
-    const nonFavoriteCandidates = dayGames.filter(
-      (game) => isNonFavoriteMajor(game) || isNonFavoriteMajorUcl(game),
-    );
-    const selectedNonFavorites = sortGamesByPriority(nonFavoriteCandidates).slice(0, 3);
-    selected.push(...favorites, ...selectedNonFavorites);
-  }
-
-  const selectedIds = new Set(selected.map((game) => game.id));
-
-  return windowGames
-    .filter((game) => selectedIds.has(game.id))
-    .sort(compareForDisplay);
+  return getMyGamesWindow(games, now);
 }
 
+/** Returns today's top five games, or fewer when today's scoped category has fewer than five. */
 export function getTodayMyGames(games, now = new Date()) {
   const todayKey = getLocalDateKey(now);
-  return getMyGames(games, now).filter(
-    (game) => getLocalDateKey(new Date(game.startTime)) === todayKey,
-  );
+  return getMyGames(games, now)
+    .filter((game) => getLocalDateKey(new Date(game.startTime)) === todayKey)
+    .sort(compareForDisplay)
+    .slice(0, MY_GAMES_SECTION_LIMIT);
 }
 
+/**
+ * Returns the next six dates in the seven-day window (tomorrow through today + 6),
+ * limited to the five highest-priority games across that period.
+ */
 export function getUpcomingMyGames(games, now = new Date()) {
-  return getMyGames(games, now);
+  const start = addDays(startOfDay(now), 1);
+  const endExclusive = addDays(startOfDay(now), MY_GAMES_WINDOW_DAYS);
+
+  return getMyGamesWindow(games, now)
+    .filter((game) => isWithinRange(game, start, endExclusive))
+    .sort(compareForDisplay)
+    .slice(0, MY_GAMES_SECTION_LIMIT);
+}
+
+/** Returns today's and upcoming section games as a compact presentation model. */
+export function getMyGamesSections(games, now = new Date()) {
+  return {
+    today: getTodayMyGames(games, now),
+    upcoming: getUpcomingMyGames(games, now),
+  };
 }
 
 export function groupMyGamesByDate(games, now = new Date()) {
@@ -186,4 +176,4 @@ export function getPriorityForGame(game) {
   return getPriorityTier(game);
 }
 
-export { MY_GAMES_WINDOW_DAYS };
+export { MY_GAMES_WINDOW_DAYS, MY_GAMES_SECTION_LIMIT };
