@@ -38,7 +38,7 @@ function scoreFor(game, side) {
   return teamScore != null ? teamScore : null;
 }
 
-export function GameCard({ game, compact = false }) {
+export function GameCard({ game, compact = false, onOpen }) {
   const league = leagues.find((item) => item.id === game.leagueId);
   const tier = getPriorityTier(game);
   const isFeatured = !compact && tier <= 1;
@@ -50,7 +50,7 @@ export function GameCard({ game, compact = false }) {
   const homeScore = scoreFor(game, 'home');
 
   return (
-    <button className={`game-card ${compact ? 'compact' : ''} ${isFeatured ? 'featured' : ''} ${isFinal ? 'final' : ''} ${isLive ? 'live' : ''} ${leagueAccents[game.leagueId] || 'accent-neutral'}`}>
+    <button type="button" className={`game-card ${compact ? 'compact' : ''} ${isFeatured ? 'featured' : ''} ${isFinal ? 'final' : ''} ${isLive ? 'live' : ''} ${leagueAccents[game.leagueId] || 'accent-neutral'}`} onClick={() => onOpen?.(game)} aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}`}>
       <div className="game-card-top">
         <span className="league-label">{league?.shortName || game.leagueId.toUpperCase()}</span>
         <PriorityIndicator game={game} />
