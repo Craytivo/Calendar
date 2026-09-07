@@ -3,6 +3,17 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "scripts": {"dev": "vite", "build": "vite build", "preview": "vite preview"},
-  "dependencies": {"@vitejs/plugin-react": "4.3.4", "vite": "6.1.0", "react": "19.0.0", "react-dom": "19.0.0", "lucide-react": "0.468.0"}
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node src/sports/priority.test.js && node src/sports/selectors.test.js && node src/sports/adapters/normalizer.test.js"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "4.3.4",
+    "vite": "6.1.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "lucide-react": "0.468.0"
+  }
 }
