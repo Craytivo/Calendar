@@ -2,99 +2,25 @@ import { normalizeGames } from './normalizer.js';
 
 const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports';
 const ESPN_FALLBACK_BASE = 'https://site.web.api.espn.com/apis/site/v2/sports';
-const ESPN_HEADERS = {
-  Accept: 'application/json',
-  'User-Agent': 'Craytivo Sports Calendar/1.0',
-};
-
-const LEAGUE_CONFIG = {
-  nfl: { sport: 'football', league: 'nfl' },
-  nba: { sport: 'basketball', league: 'nba' },
-  'ncaa-football': { sport: 'football', league: 'college-football' },
-  mlb: { sport: 'baseball', league: 'mlb' },
-  nhl: { sport: 'hockey', league: 'nhl' },
-  ufc: { sport: 'mma', league: 'ufc' },
-  epl: { sport: 'soccer', league: 'eng.1' },
-  'epl-cup': { sport: 'soccer', league: 'eng.league_cup' },
-  laliga: { sport: 'soccer', league: 'esp.1' },
-  ucl: { sport: 'soccer', league: 'uefa.champions' },
-};
-
-const FAVORITE_TEAMS = {
-  'sac-kings': { name: 'Sacramento Kings', sport: 'basketball', league: 'nba', externalId: '23' },
-  'oregon-ducks': { name: 'Oregon Ducks', sport: 'football', league: 'college-football', externalId: '2483' },
-  'real-madrid': { name: 'Real Madrid', sport: 'soccer', league: 'esp.1', externalId: '86' },
-  tottenham: { name: 'Tottenham Hotspur', sport: 'soccer', league: 'eng.1', externalId: '367' },
-  'blue-jays': { name: 'Toronto Blue Jays', sport: 'baseball', league: 'mlb', externalId: '14' },
-  dodgers: { name: 'Los Angeles Dodgers', sport: 'baseball', league: 'mlb', externalId: '119' },
-  oilers: { name: 'Edmonton Oilers', sport: 'hockey', league: 'nhl', externalId: '25' },
-  vikings: { name: 'Minnesota Vikings', sport: 'football', league: 'nfl', externalId: '16' },
-};
-
-const FAVORITE_TEAM_IDS = {
-  'Sacramento Kings': 'sac-kings', 'Oregon Ducks': 'oregon-ducks', Oregon: 'oregon-ducks', 'Real Madrid': 'real-madrid',
-  Tottenham: 'tottenham', 'Tottenham Hotspur': 'tottenham', 'Toronto Blue Jays': 'blue-jays', 'Los Angeles Dodgers': 'dodgers', Dodgers: 'dodgers',
-  'Edmonton Oilers': 'oilers', 'Minnesota Vikings': 'vikings',
-};
-
+const ESPN_HEADERS = { Accept: 'application/json', 'User-Agent': 'Craytivo Sports Calendar/1.0' };
+const LEAGUE_CONFIG = { nfl: { sport: 'football', league: 'nfl' }, nba: { sport: 'basketball', league: 'nba' }, 'ncaa-football': { sport: 'football', league: 'college-football' }, mlb: { sport: 'baseball', league: 'mlb' }, nhl: { sport: 'hockey', league: 'nhl' }, ufc: { sport: 'mma', league: 'ufc' }, epl: { sport: 'soccer', league: 'eng.1' }, 'epl-cup': { sport: 'soccer', league: 'eng.league_cup' }, laliga: { sport: 'soccer', league: 'esp.1' }, ucl: { sport: 'soccer', league: 'uefa.champions' } };
+const FAVORITE_TEAMS = { 'sac-kings': { name: 'Sacramento Kings', sport: 'basketball', league: 'nba', externalId: '23' }, 'oregon-ducks': { name: 'Oregon Ducks', sport: 'football', league: 'college-football', externalId: '2483' }, 'real-madrid': { name: 'Real Madrid', sport: 'soccer', league: 'esp.1', externalId: '86' }, tottenham: { name: 'Tottenham Hotspur', sport: 'soccer', league: 'eng.1', externalId: '367' }, 'blue-jays': { name: 'Toronto Blue Jays', sport: 'baseball', league: 'mlb', externalId: '14' }, dodgers: { name: 'Los Angeles Dodgers', sport: 'baseball', league: 'mlb', externalId: '119' }, oilers: { name: 'Edmonton Oilers', sport: 'hockey', league: 'nhl', externalId: '25' }, vikings: { name: 'Minnesota Vikings', sport: 'football', league: 'nfl', externalId: '16' } };
+const FAVORITE_TEAM_IDS = { 'Sacramento Kings': 'sac-kings', 'Oregon Ducks': 'oregon-ducks', Oregon: 'oregon-ducks', 'Real Madrid': 'real-madrid', Tottenham: 'tottenham', 'Tottenham Hotspur': 'tottenham', 'Toronto Blue Jays': 'blue-jays', 'Los Angeles Dodgers': 'dodgers', Dodgers: 'dodgers', 'Edmonton Oilers': 'oilers', 'Minnesota Vikings': 'vikings' };
 function addDays(date, days) { return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days); }
 function dateKey(date) { const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, '0'); const day = String(date.getDate()).padStart(2, '0'); return `${year}${month}${day}`; }
 function cleanName(name = '') { return String(name).replace(/\s+/g, ' ').trim(); }
 function favoriteIdFor(name = '') { return FAVORITE_TEAM_IDS[cleanName(name)] || undefined; }
-function teamFromCompetitor(competitor, leagueId) {
-  const rawName = cleanName(competitor?.team?.displayName || competitor?.team?.name || competitor?.athlete?.displayName || competitor?.displayName);
-  const favoriteId = favoriteIdFor(rawName); const team = competitor?.team || competitor?.athlete || competitor || {};
-  const id = favoriteId || String(team.id || competitor?.id || rawName).trim(); const abbreviation = cleanName(team.abbreviation || competitor?.abbreviation || rawName).toUpperCase();
-  const logoUrl = team.logo || team.logos?.[0]?.href; const primaryColor = team.color || team.colors?.primary;
-  return { id, name: rawName, abbreviation, leagueId, ...(favoriteId ? { favorite: true } : {}), ...(logoUrl ? { logoUrl } : {}), ...(primaryColor ? { primaryColor } : {}) };
-}
-function eventTypeFor(event) {
-  const competition = event?.competitions?.[0]; const seasonType = String(event?.season?.slug || event?.season?.type?.slug || '').toLowerCase();
-  const typeText = [event?.type?.text, event?.type?.name, event?.status?.type?.name, seasonType].join(' ').toLowerCase();
-  if (typeText.includes('championship') || typeText.includes('final')) return 'championship';
-  if (typeText.includes('playoff') || typeText.includes('postseason') || typeText.includes('knockout')) return 'playoff';
-  if (typeText.includes('preseason')) return 'preseason';
-  if (competition?.type?.abbreviation === 'STD') return 'regular-season';
-  return 'regular-season';
-}
-function statusFor(event) {
-  const status = event?.status?.type;
-  if (status?.completed) return 'final'; if (status?.state === 'in') return 'live';
-  if (status?.name === 'STATUS_POSTPONED') return 'postponed'; if (status?.name === 'STATUS_CANCELED') return 'cancelled'; return 'scheduled';
-}
+function teamFromCompetitor(competitor, leagueId) { const rawName = cleanName(competitor?.team?.displayName || competitor?.team?.name || competitor?.athlete?.displayName || competitor?.displayName); const favoriteId = favoriteIdFor(rawName); const team = competitor?.team || competitor?.athlete || competitor || {}; const id = favoriteId || String(team.id || competitor?.id || rawName).trim(); const abbreviation = cleanName(team.abbreviation || competitor?.abbreviation || rawName).toUpperCase(); const logoUrl = team.logo || team.logos?.[0]?.href; const primaryColor = team.color || team.colors?.primary; return { id, name: rawName, abbreviation, leagueId, ...(favoriteId ? { favorite: true } : {}), ...(logoUrl ? { logoUrl } : {}), ...(primaryColor ? { primaryColor } : {}) }; }
+function eventTypeFor(event) { const competition = event?.competitions?.[0]; const seasonType = String(event?.season?.slug || event?.season?.type?.slug || '').toLowerCase(); const typeText = [event?.type?.text, event?.type?.name, event?.status?.type?.name, seasonType].join(' ').toLowerCase(); if (typeText.includes('championship') || typeText.includes('final')) return 'championship'; if (typeText.includes('playoff') || typeText.includes('postseason') || typeText.includes('knockout')) return 'playoff'; if (typeText.includes('preseason')) return 'preseason'; if (competition?.type?.abbreviation === 'STD') return 'regular-season'; return 'regular-season'; }
+function statusFor(event) { const status = event?.status?.type; if (status?.completed) return 'final'; if (status?.state === 'in') return 'live'; if (status?.name === 'STATUS_POSTPONED') return 'postponed'; if (status?.name === 'STATUS_CANCELED') return 'cancelled'; return 'scheduled'; }
 function scoreFor(competitor, scores) { const raw = scores.get(competitor?.id); if (raw == null || raw === '') return undefined; const numeric = Number(raw); return Number.isFinite(numeric) ? numeric : undefined; }
-function clockSecondsFor(displayClock) {
-  if (typeof displayClock !== 'string') return undefined;
-  const match = displayClock.trim().match(/^(?:(\d+):)?(\d+):?(\d+)?$/);
-  if (!match) return undefined;
-  if (match[3] !== undefined) return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
-  return Number(match[1] ?? 0) * 60 + Number(match[2]);
-}
-function mapEvent(event, leagueId) {
-  const competition = event?.competitions?.[0]; const competitors = competition?.competitors || [];
-  const home = competitors.find((item) => item.homeAway === 'home') || competitors[1]; const away = competitors.find((item) => item.homeAway === 'away') || competitors[0];
-  if (!home || !away || !event?.date) return null;
-  const homeTeam = teamFromCompetitor(home, leagueId); const awayTeam = teamFromCompetitor(away, leagueId); const scores = new Map(competitors.map((item) => [item.id, item.score]));
-  const homeScore = scoreFor(home, scores); const awayScore = scoreFor(away, scores); const isCup = leagueId === 'epl-cup'; const normalizedLeagueId = isCup ? 'epl' : leagueId;
-  const displayClock = event?.status?.displayClock; const period = event?.status?.period; const isOvertime = Boolean(event?.status?.period && event?.status?.type?.shortDetail?.toLowerCase?.().includes('ot'));
-  const broadcasts = competition?.broadcasts?.[0]?.names?.join(', ') || competition?.broadcast?.[0]?.names?.join(', ');
-  return {
-    id: `espn:${leagueId}:${event.id}`, leagueId: normalizedLeagueId, homeTeamId: homeTeam.id, awayTeamId: awayTeam.id, startTime: event.date,
-    venue: competition?.venue?.fullName || competition?.venue?.address?.city, status: statusFor(event), eventType: eventTypeFor(event), round: event?.week?.text || event?.season?.slug,
-    competitionId: competition?.id || event?.id, competitionPhase: event?.season?.type?.slug, isMajorEvent: Boolean(event?.league?.isTournament || event?.isPostseason || isCup),
-    isElimination: Boolean(event?.isElimination), ...(isCup ? { competitionName: 'Carabao Cup' } : {}),
-    ...(homeScore !== undefined ? { homeScore } : {}), ...(awayScore !== undefined ? { awayScore } : {}),
-    ...(period !== undefined ? { period: Number(period) } : {}), ...(displayClock ? { clock: displayClock } : {}),
-    ...(clockSecondsFor(displayClock) !== undefined ? { clockSeconds: clockSecondsFor(displayClock) } : {}), ...(isOvertime ? { isOvertime: true } : {}),
-    ...(broadcasts ? { network: broadcasts } : {}),
-    homeTeam: { ...homeTeam, ...(homeScore !== undefined ? { score: homeScore } : {}) }, awayTeam: { ...awayTeam, ...(awayScore !== undefined ? { score: awayScore } : {}) },
-  };
-}
+function clockSecondsFor(displayClock) { if (typeof displayClock !== 'string') return undefined; const parts = displayClock.trim().split(':').map(Number); if (parts.some((part) => !Number.isFinite(part))) return undefined; if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]; if (parts.length === 2) return parts[0] * 60 + parts[1]; if (parts.length === 1) return parts[0]; return undefined; }
+function mapEvent(event, leagueId) { const competition = event?.competitions?.[0]; const competitors = competition?.competitors || []; const home = competitors.find((item) => item.homeAway === 'home') || competitors[1]; const away = competitors.find((item) => item.homeAway === 'away') || competitors[0]; if (!home || !away || !event?.date) return null; const homeTeam = teamFromCompetitor(home, leagueId); const awayTeam = teamFromCompetitor(away, leagueId); const scores = new Map(competitors.map((item) => [item.id, item.score])); const homeScore = scoreFor(home, scores); const awayScore = scoreFor(away, scores); const isCup = leagueId === 'epl-cup'; const normalizedLeagueId = isCup ? 'epl' : leagueId; const displayClock = event?.status?.displayClock; const period = event?.status?.period; const shortDetail = String(event?.status?.type?.shortDetail || '').toLowerCase(); const isOvertime = /\bot\b|overtime/.test(shortDetail); const broadcasts = competition?.broadcasts?.[0]?.names?.join(', ') || competition?.broadcast?.[0]?.names?.join(', '); return { id: `espn:${leagueId}:${event.id}`, leagueId: normalizedLeagueId, homeTeamId: homeTeam.id, awayTeamId: awayTeam.id, startTime: event.date, venue: competition?.venue?.fullName || competition?.venue?.address?.city, status: statusFor(event), eventType: eventTypeFor(event), round: event?.week?.text || event?.season?.slug, competitionId: competition?.id || event?.id, competitionPhase: event?.season?.type?.slug, isMajorEvent: Boolean(event?.league?.isTournament || event?.isPostseason || isCup), isElimination: Boolean(event?.isElimination), ...(isCup ? { competitionName: 'Carabao Cup' } : {}), ...(homeScore !== undefined ? { homeScore } : {}), ...(awayScore !== undefined ? { awayScore } : {}), ...(period !== undefined ? { period: Number(period) } : {}), ...(displayClock ? { clock: displayClock } : {}), ...(clockSecondsFor(displayClock) !== undefined ? { clockSeconds: clockSecondsFor(displayClock) } : {}), ...(isOvertime ? { isOvertime: true } : {}), ...(broadcasts ? { network: broadcasts } : {}), homeTeam: { ...homeTeam, ...(homeScore !== undefined ? { score: homeScore } : {}) }, awayTeam: { ...awayTeam, ...(awayScore !== undefined ? { score: awayScore } : {}) } }; }
 function fallbackUrlFor(url) { return url.replace(ESPN_BASE, ESPN_FALLBACK_BASE); }
 function shouldTryFallback(error) { return error?.status === 403 || error?.name === 'TypeError' || /Network connection lost|fetch failed/i.test(error?.message || ''); }
 async function requestJson(url) { const response = await fetch(url, { headers: ESPN_HEADERS }); if (!response.ok) { const error = new Error(`ESPN returned ${response.status}`); error.status = response.status; throw error; } return response.json(); }
 async function fetchJson(url) { try { return await requestJson(url); } catch (primaryError) { if (!shouldTryFallback(primaryError)) throw primaryError; await new Promise((resolve) => setTimeout(resolve, 150)); try { return await requestJson(fallbackUrlFor(url)); } catch (fallbackError) { const error = new Error(`${primaryError.message}; fallback ${fallbackError.message}`); error.status = fallbackError.status || primaryError.status; throw error; } } }
 function normalizeEvents(payload, leagueId) { const events = Array.isArray(payload?.events) ? payload.events : []; return normalizeGames(events.map((event) => mapEvent(event, leagueId)).filter(Boolean)); }
 export async function fetchEspnLeagueWindow(leagueId, startDate, days = 7) { const config = LEAGUE_CONFIG[leagueId]; if (!config) throw new Error(`Unsupported ESPN league: ${leagueId}`); const endDate = addDays(startDate, days - 1); const url = `${ESPN_BASE}/${config.sport}/${config.league}/scoreboard?dates=${dateKey(startDate)}-${dateKey(endDate)}`; return normalizeEvents(await fetchJson(url), leagueId); }
-export async function fetchEspnTeamWindow(teamId, startDate, days = 7) { const favorite = FAVORITE_TEAMS[teamId]; if (!favorite) throw new Error(`Unsupported favorite team: ${teamId}`); const endDate = addDays(startDate, days - 1); const url = `${ESPN_BASE}/${favorite.sport}/${favorite.league}/teams/${favorite.externalId}/schedule?dates=${dateKey(startDate)}-${dateKey(endDate)}`; const leagueId = favorite.league === 'eng.1' ? 'epl' : favorite.league === 'esp.1' ? 'laliga' : Object.keys(LEAGUE_CONFIG).find((key) => LEAGUE_CONFIG[key].sport === favorite.sport && LEAGUE_CONFIG[key].league === favorite.league) || favorite.league; return normalizeEvents(await fetchJson(url), leagueId); }
+export async function fetchEspnTeamWindow(teamId, startDate, days = 7) { const favorite = FAVORITE_TEAMS[teamId]; if (!favorite) throw new Error(`Unsupported favorite team: ${teamId}`); const endDate = addDays(startDate, days - 1); const url = `${ESPN_BASE}/${favorite.sport}/${favorite.league}/teams/${favorite.externalId}/schedule?dates=${dateKey(startDate)}-${dateKey(endDate)}`; const payload = await fetchJson(url); const leagueId = favorite.league === 'eng.1' ? 'epl' : favorite.league === 'esp.1' ? 'laliga' : Object.keys(LEAGUE_CONFIG).find((key) => LEAGUE_CONFIG[key].sport === favorite.sport && LEAGUE_CONFIG[key].league === favorite.league) || favorite.league; return normalizeEvents(payload, leagueId); }
 export function favoriteTeamIds() { return Object.keys(FAVORITE_TEAMS); }
