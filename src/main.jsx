@@ -15,7 +15,7 @@ const viewerTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 function App() {
   const today = new Date();
   const [view, setView] = useState('my-games');
-  const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+  const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
   const [games, setGames] = useState([]);
   const [activeLeagues, setActiveLeagues] = useState(leagues.map((league) => league.id));
   const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -42,15 +42,15 @@ function App() {
 
   useEffect(() => { loadGames(); }, []);
 
-  const filteredMyGames = useMemo(() => {
-    const selected = getMyGames(games, today);
-    return selected
-      .filter((game) => activeLeagues.includes(game.leagueId))
-      .filter((game) => !favoritesOnly || favoriteTeamIds.has(game.homeTeamId) || favoriteTeamIds.has(game.awayTeamId));
-  }, [games, activeLeagues, favoritesOnly]);
+  const filteredGames = useMemo(() => games
+    .filter((game) => activeLeagues.includes(game.leagueId))
+    .filter((game) => !favoritesOnly || favoriteTeamIds.has(game.homeTeamId) || favoriteTeamIds.has(game.awayTeamId)),
+  [games, activeLeagues, favoritesOnly]);
+
+  const filteredMyGames = useMemo(() => getMyGames(filteredGames, today), [filteredGames]);
 
   const toggleLeague = (id) => setActiveLeagues((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]);
-  const shiftMonth = (delta) => setCursor((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+  const shiftWeek = (delta) => setCursor((current) => new Date(current.getFullYear(), current.getMonth(), current.getDate() + (delta * 7)));
 
   return (
     <main className="app-shell">
@@ -72,7 +72,7 @@ function App() {
       {view === 'my-games' ? (
         <MyGamesView games={filteredMyGames} now={today} />
       ) : (
-        <CalendarView games={filteredMyGames} cursor={cursor} onShiftMonth={shiftMonth} />
+        <CalendarView games={filteredGames} cursor={cursor} onShiftWeek={shiftWeek} />
       )}
 
       <footer>
