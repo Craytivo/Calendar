@@ -1,4 +1,4 @@
-import { THESPORTSDB_LEAGUES, normalizeTheSportsDbEvents } from '../src/sports/adapters/thesportsdb.js';
+import { THESPORTSDB_LEAGUES } from '../src/sports/adapters/thesportsdb.js';
 import { fetchEspnLeagueWindow } from '../src/sports/adapters/espn-schedules.js';
 import { enrichGamesWithEspnStandings } from '../src/sports/adapters/espn-standings.js';
 import { applyDomesticSoccerRaceContext } from '../src/sports/adapters/soccer-context.js';
@@ -7,8 +7,11 @@ const API_BASE = 'https://www.thesportsdb.com/api/v1/json/123';
 const WINDOW_DAYS = 7;
 const CACHE_SECONDS = 60;
 
-const ESPN_SCHEDULE_LEAGUES = ['nfl', 'nba', 'ncaa-football', 'mlb', 'nhl', 'ufc'];
-const SOCCER_LEAGUES = ['ucl', 'laliga', 'epl'];
+const ESPN_SCHEDULE_LEAGUES = [
+  'nfl', 'nba', 'ncaa-football', 'mlb', 'nhl', 'ufc',
+  'epl', 'epl-cup', 'laliga', 'ucl',
+];
+const SOCCER_STANDING_LEAGUES = ['ucl', 'laliga', 'epl'];
 
 function addDays(date, days) { return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days); }
 function dateKey(date) { return date.toISOString().slice(0, 10); }
@@ -21,14 +24,6 @@ async function getJson(url) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`TheSportsDB returned ${response.status}`);
   return response.json();
-}
-
-async function fetchLeagueEvents(league) {
-  const [nextResult, previousResult] = await Promise.all([
-    getJson(`${API_BASE}/eventsnextleague.php?id=${league.providerId}`),
-    getJson(`${API_BASE}/eventspastleague.php?id=${league.providerId}`),
-  ]);
-  return [...(nextResult.events ?? []), ...(previousResult.events ?? [])];
 }
 
 async function fetchSoccerTable(league, today) {
@@ -78,6 +73,17 @@ function sourceRecord(id, name, provider, status, count = 0, error = null) {
   return { id, name, provider, status, count, ...(error ? { error } : {}) };
 }
 
+function sourceName(leagueId) {
+  const names = {
+    'ncaa-football': 'NCAA Football',
+    'epl-cup': 'Carabao Cup',
+    epl: 'Premier League',
+    laliga: 'La Liga',
+    ucl: 'UEFA Champions League',
+  };
+  return names[leagueId] || leagueId.toUpperCase();
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -92,38 +98,23 @@ export default async function handler(req, res) {
   const sources = [];
   const diagnostics = { standings: [] };
 
-  const espnResults = await Promise.allSettled(
+  const scheduleResults = await Promise.allSettled(
     ESPN_SCHEDULE_LEAGUES.map(async (leagueId) => [leagueId, await fetchEspnLeagueWindow(leagueId, today, days)]),
   );
 
-  espnResults.forEach((result, index) => {
+  scheduleResults.forEach((result, index) => {
     const leagueId = ESPN_SCHEDULE_LEAGUES[index];
     if (result.status === 'fulfilled') {
       const [, leagueGames] = result.value;
       const normalized = leagueGames.filter((game) => inWindow(game, startKey, endKey));
       games.push(...normalized);
-      sources.push(sourceRecord(leagueId, leagueId === 'ncaa-football' ? 'NCAA Football' : leagueId.toUpperCase(), 'ESPN public scoreboard', 'ok', normalized.length));
+      sources.push(sourceRecord(leagueId, sourceName(leagueId), 'ESPN public scoreboard', 'ok', normalized.length));
     } else {
-      sources.push(sourceRecord(leagueId, leagueId === 'ncaa-football' ? 'NCAA Football' : leagueId.toUpperCase(), 'ESPN public scoreboard', 'error', 0, errorMessage(result.reason)));
+      sources.push(sourceRecord(leagueId, sourceName(leagueId), 'ESPN public scoreboard', 'error', 0, errorMessage(result.reason)));
     }
   });
 
-  const soccerLeagues = THESPORTSDB_LEAGUES.filter((league) => SOCCER_LEAGUES.includes(league.id));
-  const soccerResults = await Promise.allSettled(
-    soccerLeagues.map(async (league) => ({ league, events: await fetchLeagueEvents(league) })),
-  );
-
-  soccerResults.forEach((result, index) => {
-    const league = soccerLeagues[index];
-    if (result.status === 'fulfilled') {
-      const normalized = normalizeTheSportsDbEvents(result.value.events, league).filter((game) => inWindow(game, startKey, endKey));
-      games.push(...normalized);
-      sources.push(sourceRecord(league.id, league.name, 'TheSportsDB', 'ok', normalized.length));
-    } else {
-      sources.push(sourceRecord(league.id, league.name, 'TheSportsDB', 'error', 0, errorMessage(result.reason)));
-    }
-  });
-
+  const soccerLeagues = THESPORTSDB_LEAGUES.filter((league) => SOCCER_STANDING_LEAGUES.includes(league.id));
   const tableResults = await Promise.allSettled(
     soccerLeagues.map(async (league) => [league.id, await fetchSoccerTable(league, today)]),
   );
