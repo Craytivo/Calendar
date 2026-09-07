@@ -20,6 +20,8 @@ const favoriteLogoPaths = {
   vikings: '/team-logos/vikings.png',
 };
 
+const leagueLogoPaths = new Set(['nfl', 'nba', 'mlb']);
+
 const collegeAbbreviations = {
   'Alabama Crimson Tide': 'ALA', 'Arkansas Razorbacks': 'ARK', 'Auburn Tigers': 'AUB',
   'Clemson Tigers': 'CLEM', 'Florida Gators': 'FLA', 'Florida State Seminoles': 'FSU',
@@ -63,11 +65,17 @@ export function getDisplayTeamName(team) {
   return collegeShortNames[name] || name;
 }
 
+function getLocalLogoPath(team) {
+  if (favoriteLogoPaths[team?.id]) return favoriteLogoPaths[team.id];
+  if (leagueLogoPaths.has(team?.leagueId) && team?.id) return `/team-logos/${team.leagueId}/${team.id}.png`;
+  return null;
+}
+
 export function TeamMark({ team, size = 'medium' }) {
   const identity = teamIdentity[team?.id];
   const color = team?.color || team?.primaryColor || team?.teamColor || identity?.color || '#64748b';
   const label = getTeamAbbreviation(team);
-  const localLogoPath = favoriteLogoPaths[team?.id];
+  const localLogoPath = getLocalLogoPath(team);
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
