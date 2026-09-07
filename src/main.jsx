@@ -39,9 +39,30 @@ function localDateKey(date) {
 function mergeLiveGames(currentGames, liveGames) {
   if (!liveGames.length) return currentGames;
   const updates = new Map(liveGames.map((game) => [game.id, game]));
-  const merged = currentGames.map((game) => updates.get(game.id) ? { ...game, ...updates.get(game.id) } : game);
+  const merged = currentGames.map((game) => {
+    const update = updates.get(game.id);
+    if (!update) return game;
+    return {
+      ...game,
+      ...update,
+      homeTeam: { ...game.homeTeam, ...update.homeTeam },
+      awayTeam: { ...game.awayTeam, ...update.awayTeam },
+    };
+  });
   const existingIds = new Set(currentGames.map((game) => game.id));
   return [...merged, ...liveGames.filter((game) => !existingIds.has(game.id))];
+}
+
+function mergeSelectedGame(current, liveGames) {
+  if (!current) return current;
+  const update = liveGames.find((game) => game.id === current.id);
+  if (!update) return current;
+  return {
+    ...current,
+    ...update,
+    homeTeam: { ...current.homeTeam, ...update.homeTeam },
+    awayTeam: { ...current.awayTeam, ...update.awayTeam },
+  };
 }
 
 function App() {
@@ -79,9 +100,10 @@ function App() {
   };
 
   const todayLeagueIds = useMemo(() => {
+    const todayKey = localDateKey(Date.now());
     const ids = new Set();
     for (const game of games) {
-      if (localDateKey(game.startTime) === localDateKey(Date.now())) ids.add(game.leagueId);
+      if (localDateKey(game.startTime) === todayKey) ids.add(game.leagueId);
     }
     return Array.from(ids).sort();
   }, [games]);
@@ -97,8 +119,8 @@ function App() {
       const payload = await response.json();
       const liveGames = payload.games ?? [];
       setGames((current) => mergeLiveGames(current, liveGames));
-      setSelectedGame((current) => current ? liveGames.find((game) => game.id === current.id) ? { ...current, ...liveGames.find((game) => game.id === current.id) } : current : current);
-      if (liveGames.length) setLastUpdated(payload.fetchedAt ?? new Date().toISOString());
+      setSelectedGame((current) => mergeSelectedGame(current, liveGames));
+      setLastUpdated(payload.fetchedAt ?? new Date().toISOString());
     } catch (err) {
       if (!silent) setError(err.message || 'Unable to load live sports data');
     }
@@ -116,6 +138,7 @@ function App() {
 
   useEffect(() => {
     if (!todayLeagueQuery) return undefined;
+    void loadLiveGames();
     const refreshMs = hasLiveGames ? LIVE_REFRESH_MS : IDLE_LIVE_REFRESH_MS;
     const timer = window.setInterval(() => {
       setFreshnessNow(Date.now());
