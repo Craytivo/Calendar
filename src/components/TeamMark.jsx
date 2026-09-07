@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 const teamIdentity = {
   'sac-kings': { label: 'SAC', color: '#5A2D81' },
@@ -7,6 +7,18 @@ const teamIdentity = {
   tottenham: { label: 'TOT', color: '#132257' },
   'blue-jays': { label: 'TOR', color: '#134A8E' },
   oilers: { label: 'EDM', color: '#FF4C00' },
+};
+
+// Provider-independent fallbacks for the user's favorite teams.
+// If a live provider logo is missing or stale, the UI tries this saved logo before
+// falling all the way back to the colored abbreviation mark.
+const favoriteLogoUrls = {
+  'sac-kings': 'https://a.espncdn.com/i/teamlogos/nba/500/sac.png',
+  'oregon-ducks': 'https://a.espncdn.com/i/teamlogos/ncaa/500/2483.png',
+  'real-madrid': 'https://a.espncdn.com/i/teamlogos/soccer/500/86.png',
+  tottenham: 'https://a.espncdn.com/i/teamlogos/soccer/500/367.png',
+  'blue-jays': 'https://a.espncdn.com/i/teamlogos/mlb/500/14.png',
+  oilers: 'https://a.espncdn.com/i/teamlogos/nhl/500/25.png',
 };
 
 const collegeAbbreviations = {
@@ -56,9 +68,26 @@ export function TeamMark({ team, size = 'medium' }) {
   const identity = teamIdentity[team?.id];
   const color = team?.color || team?.primaryColor || team?.teamColor || identity?.color || '#64748b';
   const label = getTeamAbbreviation(team);
-  const logoUrl = normalizedName(team?.logoUrl);
+  const providerLogoUrl = normalizedName(team?.logoUrl);
+  const savedLogoUrl = favoriteLogoUrls[team?.id];
+  const initialLogoUrl = providerLogoUrl || savedLogoUrl || '';
+  const [imageUrl, setImageUrl] = useState(initialLogoUrl);
   const [imageFailed, setImageFailed] = useState(false);
-  const showLogo = Boolean(logoUrl) && !imageFailed;
+
+  useEffect(() => {
+    setImageUrl(initialLogoUrl);
+    setImageFailed(false);
+  }, [initialLogoUrl]);
+
+  const showLogo = Boolean(imageUrl) && !imageFailed;
+
+  const handleImageError = () => {
+    if (savedLogoUrl && imageUrl !== savedLogoUrl) {
+      setImageUrl(savedLogoUrl);
+      return;
+    }
+    setImageFailed(true);
+  };
 
   return (
     <span
@@ -68,12 +97,12 @@ export function TeamMark({ team, size = 'medium' }) {
     >
       {showLogo ? (
         <img
-          src={logoUrl}
+          src={imageUrl}
           alt=""
           aria-hidden="true"
           loading="lazy"
           decoding="async"
-          onError={() => setImageFailed(true)}
+          onError={handleImageError}
         />
       ) : (
         <span>{label}</span>
