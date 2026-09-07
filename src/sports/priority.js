@@ -14,6 +14,20 @@ const favoriteTeamIds = new Set(
 
 const realMadridTeamIds = new Set(['real-madrid']);
 
+// Used only as a deterministic tie-breaker after importance has been established.
+// It does not override favorite-team or must-see priority tiers.
+const LEAGUE_PRIORITY = {
+  nfl: 0,
+  nba: 1,
+  'ncaa-football': 2,
+  ucl: 3,
+  laliga: 4,
+  epl: 5,
+  mlb: 6,
+  nhl: 7,
+  ufc: 8,
+};
+
 function gameHasTeam(game, teamIds) {
   return teamIds.has(game.homeTeamId) || teamIds.has(game.awayTeamId);
 }
@@ -178,9 +192,8 @@ function isMajorUclGame(game) {
  * Returns the user's priority tier for a game.
  * Lower tiers are more important.
  *
- * The rules are intentionally deterministic. The UI does not decide what is
- * important; this module does. External sports data should provide the
- * rankings, records, standings, phases, and implication flags used here.
+ * Favorite-team and must-see rules intentionally run before generic major
+ * events, so a favorite game can never be displaced by a non-favorite major.
  */
 export function getPriorityTier(game) {
   if (isMajorUclGame(game)) {
@@ -245,6 +258,10 @@ function getSecondaryPriority(game) {
   return 2;
 }
 
+export function getLeaguePriority(leagueId) {
+  return LEAGUE_PRIORITY[leagueId] ?? Number.MAX_SAFE_INTEGER;
+}
+
 export function sortGamesByPriority(games) {
   return [...games].sort((a, b) => {
     const tierDifference = getPriorityTier(a) - getPriorityTier(b);
@@ -257,6 +274,12 @@ export function sortGamesByPriority(games) {
 
     if (secondaryDifference !== 0) {
       return secondaryDifference;
+    }
+
+    const leagueDifference = getLeaguePriority(a.leagueId) - getLeaguePriority(b.leagueId);
+
+    if (leagueDifference !== 0) {
+      return leagueDifference;
     }
 
     return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
