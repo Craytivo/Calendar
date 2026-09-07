@@ -11,7 +11,7 @@ function Section({ eyebrow, title, games, emptyMessage, onOpenGame }) {
           <span className="day-kicker">{eyebrow}</span>
           <h2>{title}</h2>
         </div>
-        {games.length > 0 && <span className="section-count">{games.length} of 5</span>}
+        {games.length > 0 && <span className="section-count">{games.length} {games.length === 1 ? 'game' : 'games'}</span>}
       </div>
 
       {games.length > 0 ? (
@@ -42,6 +42,12 @@ export function MyGamesView({ games, now, onOpenGame }) {
 
   return (
     <div className="my-games-list">
+      <header className="my-games-intro">
+        <span className="day-kicker">My Games</span>
+        <h1>Your highest-signal games</h1>
+        <p>Live first, then the most important games from your seven-day window.</p>
+      </header>
+
       {liveGames.length > 0 && (
         <div className="live-now-banner" aria-label={`${liveGames.length} live game${liveGames.length === 1 ? '' : 's'}`}>
           <Radio size={15} />
@@ -60,7 +66,7 @@ export function MyGamesView({ games, now, onOpenGame }) {
 
       <Section
         eyebrow="Next 6 Days"
-        title="Next Week"
+        title="Next 6 Days"
         games={upcoming}
         onOpenGame={onOpenGame}
         emptyMessage="No games from your category scope in the next six days."
