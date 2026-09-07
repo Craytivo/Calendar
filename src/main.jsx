@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { leagues } from './sports/leagues.js';
 import { favoriteTeamIds } from './sports/team-identity.js';
@@ -99,6 +99,8 @@ function App() {
   const [view, setView] = useState('my-games');
   const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
   const [games, setGames] = useState([]);
+  const gamesRef = useRef(games);
+  gamesRef.current = games;
   const [activeLeagues, setActiveLeagues] = useState(leagues.map((league) => league.id));
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -122,7 +124,7 @@ function App() {
       setLastUpdated(payload.fetchedAt ?? new Date().toISOString());
       setSelectedGame((current) => current ? nextGames.find((game) => game.id === current.id) ?? current : current);
     } catch (err) {
-      if (!silent || !games.length) setError(err.message || 'Unable to load sports data');
+      if (!silent || !gamesRef.current.length) setError(err.message || 'Unable to load sports data');
     } finally {
       if (!silent) setLoading(false);
     }
@@ -173,7 +175,7 @@ function App() {
 
     const scheduleNextLiveRefresh = () => {
       if (cancelled) return;
-      const delay = getLiveRefreshDelay(games);
+      const delay = getLiveRefreshDelay(gamesRef.current);
       if (delay == null) return;
       timer = window.setTimeout(async () => {
         setFreshnessNow(Date.now());
@@ -189,7 +191,7 @@ function App() {
       cancelled = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [todayLeagueQuery, games]);
+  }, [todayLeagueQuery]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setFreshnessNow(Date.now()), 10_000);
