@@ -177,6 +177,14 @@ export default async function handler(req, res) {
     .filter((game) => inWindow(game, startKey, endKey))
     .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
 
+  const nflSource = sources.find((source) => source.id === 'nfl');
+  const scheduleErrors = sources.filter((source) => source.status === 'error');
+  const health = {
+    status: scheduleErrors.length === ESPN_SCHEDULE_LEAGUES.length ? 'degraded' : 'ok',
+    nfl: nflSource ? { status: nflSource.status, count: nflSource.count, ...(nflSource.error ? { error: nflSource.error } : {}) } : { status: 'missing', count: 0 },
+    failedSources: scheduleErrors.map((source) => source.id),
+  };
+
   res.setHeader('Cache-Control', `s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS}`);
   return res.status(200).json({
     source: 'free-sports-aggregation',
@@ -187,5 +195,6 @@ export default async function handler(req, res) {
     games: uniqueGames,
     sources,
     diagnostics,
+    health,
   });
 }
