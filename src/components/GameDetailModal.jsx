@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, MapPin, Radio, Trophy, Tv, X } from 'lucide-react';
+import { CalendarDays, MapPin, Radio, Tv, X } from 'lucide-react';
 import { leagues } from '../sports/leagues.js';
-import { getPriorityLabel, getPriorityTier } from '../sports/priority.js';
+import { getPriorityTier } from '../sports/priority.js';
 import { TeamMark, getDisplayTeamName } from './TeamMark.jsx';
 import './GameDetailModal.css';
 
@@ -50,13 +50,13 @@ function getImportanceText(game, tier) {
     return 'Champions League';
   }
   if (game.isDivisional) return 'Divisional matchup';
-  if (game.homeTeam?.ranking && game.awayTeam?.ranking) return 'Top-25 matchup';
+  if (game.leagueId === 'ncaa-football' && game.homeTeam?.ranking && game.awayTeam?.ranking) return 'Top-25 matchup';
   if (game.hasPlayoffImplications || game.hasSeedingImplications) return 'Playoff implications';
   if (game.hasTitleOrUclQualificationImplications) return 'Title / qualification implications';
   if (game.isElimination) return 'Elimination game';
   if (game.eventType === 'championship' || game.eventType === 'final') return 'Championship';
   if (game.eventType === 'main-card') return 'Main card';
-  if (tier <= 2) return 'Favorite team matchup';
+  if (tier <= 2) return 'Your team';
   return null;
 }
 
@@ -107,15 +107,12 @@ export function GameDetailModal({ game, onClose }) {
   const awayWinner = isFinal && awayScore != null && homeScore != null && awayScore > homeScore;
   const homeWinner = isFinal && awayScore != null && homeScore != null && homeScore > awayScore;
   const importance = getImportanceText(game, tier);
-  const favoriteTeam = Boolean(away.favorite || home.favorite);
   const liveLabel = isLive ? 'Game in progress' : isFinal ? 'Game complete' : countdown > 0 ? `Starts in ${formatCountdown(countdown)}` : 'Starting now';
 
   const meta = [
     { label: 'Date', value: formatDate(game.startTime), icon: CalendarDays },
     { label: 'Time', value: formatTime(game.startTime), icon: null },
     game.venue ? { label: 'Venue', value: game.venue, icon: MapPin } : null,
-    game.round ? { label: 'Round', value: detailValue(game.round), icon: Trophy } : null,
-    game.competitionPhase ? { label: 'Phase', value: detailValue(game.competitionPhase), icon: null } : null,
     game.network ? { label: 'Watch', value: game.network, icon: Tv } : null,
   ].filter(Boolean);
 
@@ -126,7 +123,6 @@ export function GameDetailModal({ game, onClose }) {
           <header className="game-detail-header">
             <div className="game-detail-league">
               <span className="game-detail-eyebrow">{league?.shortName || game.leagueId.toUpperCase()}</span>
-              <strong>{league?.name || game.leagueId}</strong>
             </div>
             <button type="button" className="icon-button game-detail-close" onClick={onClose} aria-label="Close game details"><X size={18} /></button>
           </header>
@@ -136,10 +132,6 @@ export function GameDetailModal({ game, onClose }) {
               {isLive ? <span className="game-detail-live-dot" /> : <span className="game-detail-status-mark" />}
               {statusLabel(game)}
             </span>
-            <div className="game-detail-badges">
-              {favoriteTeam && <span className="game-detail-favorite">Favorite team</span>}
-              {tier < 6 && <span className="game-detail-priority">{getPriorityLabel(tier)}</span>}
-            </div>
           </div>
 
           <div className="game-detail-matchup">
@@ -153,7 +145,6 @@ export function GameDetailModal({ game, onClose }) {
 
           {importance && (
             <div className="game-detail-storyline">
-              <Trophy size={16} />
               <div><span>Why it matters</span><strong>{importance}</strong></div>
             </div>
           )}
