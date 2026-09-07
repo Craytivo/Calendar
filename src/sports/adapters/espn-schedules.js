@@ -98,6 +98,13 @@ function statusFor(event) {
   return 'scheduled';
 }
 
+function scoreFor(competitor, scores) {
+  const raw = scores.get(competitor?.id);
+  if (raw == null || raw === '') return undefined;
+  const numeric = Number(raw);
+  return Number.isFinite(numeric) ? numeric : undefined;
+}
+
 function mapEvent(event, leagueId) {
   const competition = event?.competitions?.[0];
   const competitors = competition?.competitors || [];
@@ -108,6 +115,8 @@ function mapEvent(event, leagueId) {
   const homeTeam = teamFromCompetitor(home, leagueId);
   const awayTeam = teamFromCompetitor(away, leagueId);
   const scores = new Map(competitors.map((item) => [item.id, item.score]));
+  const homeScore = scoreFor(home, scores);
+  const awayScore = scoreFor(away, scores);
   const isCup = leagueId === 'epl-cup';
   const normalizedLeagueId = isCup ? 'epl' : leagueId;
 
@@ -126,15 +135,33 @@ function mapEvent(event, leagueId) {
     isMajorEvent: Boolean(event?.league?.isTournament || event?.isPostseason || isCup),
     isElimination: Boolean(event?.isElimination),
     ...(isCup ? { competitionName: 'Carabao Cup' } : {}),
-    homeTeam: { ...homeTeam, ...(scores.get(home.id) != null ? { score: Number(scores.get(home.id)) } : {}) },
-    awayTeam: { ...awayTeam, ...(scores.get(away.id) != null ? { score: Number(scores.get(away.id)) } : {}) },
+    // Keep scores at both the normalized team level and the game level so
+    // every UI surface can render a score without knowing ESPN's payload shape.
+    ...(homeScore !== undefined ? { homeScore } : {}),
+    ...(awayScore !== undefined ? { awayScore } : {}),
+    homeTeam: { ...homeTeam, ...(homeScore !== undefined ? { score: homeScore } : {}) },
+    awayTeam: { ...awayTeam, ...(awayScore !== undefined ? { score: awayScore } : {}) },
   };
 }
 
-async function fetchJson(url) {
-  const response = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (!response.ok) throw new Error(`ESPN returned ${response.status}`);
-  return response.json();
+async function fetchJson(url, attempt = 0) {
+  try {
+    const response = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!response.ok) {
+      if (attempt === 0 && response.status >= 500) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        return fetchJson(url, 1);
+      }
+      throw new Error(`ESPN returned ${response.status}`);
+    }
+    return response.json();
+  } catch (error) {
+    if (attempt === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      return fetchJson(url, 1);
+    }
+    throw error;
+  }
 }
 
 function normalizeEvents(payload, leagueId) {
