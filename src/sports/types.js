@@ -8,10 +8,6 @@ export const PRIORITY_TIERS = {
   NORMAL: 6,
 };
 
-/**
- * A normalized team record. Keeping mock/provider IDs stable lets us replace
- * data sources without rewriting the UI.
- */
 export const teams = [
   {
     id: 'sac-kings',
@@ -58,6 +54,14 @@ export const teams = [
     name: 'Edmonton Oilers',
     abbreviation: 'EDM',
     leagueId: 'nhl',
+    favorite: true,
+    favoriteTier: 'favorite',
+  },
+  {
+    id: 'vikings',
+    name: 'Minnesota Vikings',
+    abbreviation: 'MIN',
+    leagueId: 'nfl',
     favorite: true,
     favoriteTier: 'favorite',
   },
