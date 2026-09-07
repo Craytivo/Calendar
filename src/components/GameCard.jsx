@@ -2,91 +2,40 @@ import React from 'react';
 import { Clock3 } from 'lucide-react';
 import { leagues } from '../sports/leagues.js';
 import { getPriorityScore, getPriorityTier } from '../sports/priority.js';
+import { getWatchScore, getWatchLevel } from '../sports/watchability.js';
 import { PriorityIndicator } from './PriorityIndicator.jsx';
 import { TeamMark, getDisplayTeamName } from './TeamMark.jsx';
 import './GameCard.css';
 
-const leagueAccents = {
-  nfl: 'accent-neutral', nba: 'accent-blue', 'ncaa-football': 'accent-green',
-  laliga: 'accent-red', epl: 'accent-blue', mlb: 'accent-green', nhl: 'accent-red',
-  ufc: 'accent-neutral', ucl: 'accent-blue',
-};
-
-function formatTime(startTime) {
-  return new Date(startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
-
-function minutesUntil(startTime) {
-  return Math.max(0, Math.ceil((new Date(startTime).getTime() - Date.now()) / 60000));
-}
-
-function statusLabel(game, startingSoon) {
-  if (game.status === 'live') return 'LIVE';
-  if (game.status === 'final') return 'FINAL';
-  if (game.status === 'postponed') return 'POSTPONED';
-  if (game.status === 'cancelled') return 'CANCELLED';
-  if (startingSoon) return `STARTS IN ${minutesUntil(game.startTime)}M`;
-  return formatTime(game.startTime);
-}
-
-function teamLabel(team, leagueId) {
-  const name = getDisplayTeamName(team);
-  const ranking = leagueId === 'ncaa-football' && Number.isInteger(team?.ranking) && team.ranking > 0 && team.ranking <= 25
-    ? `#${team.ranking} `
-    : '';
-  return `${ranking}${name}`;
-}
-
-function scoreFor(game, side) {
-  const topLevel = side === 'away' ? game.awayScore : game.homeScore;
-  if (topLevel != null) return topLevel;
-  const teamScore = side === 'away' ? game.awayTeam?.score : game.homeTeam?.score;
-  return teamScore != null ? teamScore : null;
-}
+const leagueAccents = { nfl: 'accent-neutral', nba: 'accent-blue', 'ncaa-football': 'accent-green', laliga: 'accent-red', epl: 'accent-blue', mlb: 'accent-green', nhl: 'accent-red', ufc: 'accent-neutral', ucl: 'accent-blue' };
+function formatTime(startTime) { return new Date(startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+function minutesUntil(startTime) { return Math.max(0, Math.ceil((new Date(startTime).getTime() - Date.now()) / 60000)); }
+function statusLabel(game, startingSoon) { if (game.status === 'live') return 'LIVE'; if (game.status === 'final') return 'FINAL'; if (game.status === 'postponed') return 'POSTPONED'; if (game.status === 'cancelled') return 'CANCELLED'; if (startingSoon) return `STARTS IN ${minutesUntil(game.startTime)}M`; return formatTime(game.startTime); }
+function teamLabel(team, leagueId) { const name = getDisplayTeamName(team); const ranking = leagueId === 'ncaa-football' && Number.isInteger(team?.ranking) && team.ranking > 0 && team.ranking <= 25 ? `#${team.ranking} ` : ''; return `${ranking}${name}`; }
+function scoreFor(game, side) { const topLevel = side === 'away' ? game.awayScore : game.homeScore; if (topLevel != null) return topLevel; const teamScore = side === 'away' ? game.awayTeam?.score : game.homeTeam?.score; return teamScore != null ? teamScore : null; }
 
 export function GameCard({ game, compact = false, onOpen }) {
-  const league = leagues.find((item) => item.id === game.leagueId);
-  const tier = getPriorityTier(game);
-  const priorityScore = getPriorityScore(game);
-  const isFeatured = !compact && tier <= 1;
-  const isFinal = game.status === 'final';
-  const isLive = game.status === 'live';
-  const isStartingSoon = game.status === 'scheduled' && minutesUntil(game.startTime) <= 60 && new Date(game.startTime).getTime() >= Date.now();
-  const isFavorite = Boolean(game.homeTeam?.favorite || game.awayTeam?.favorite);
-  const away = game.awayTeam || { name: 'TBD' };
-  const home = game.homeTeam || { name: 'TBD' };
-  const awayScore = scoreFor(game, 'away');
-  const homeScore = scoreFor(game, 'home');
+  const league = leagues.find((item) => item.id === game.leagueId); const tier = getPriorityTier(game); const priorityScore = getPriorityScore(game);
+  const watchScore = getWatchScore(game); const watchLevel = getWatchLevel(watchScore); const isFeatured = !compact && tier <= 1;
+  const isFinal = game.status === 'final'; const isLive = game.status === 'live'; const isStartingSoon = game.status === 'scheduled' && minutesUntil(game.startTime) <= 60 && new Date(game.startTime).getTime() >= Date.now();
+  const isFavorite = Boolean(game.homeTeam?.favorite || game.awayTeam?.favorite); const away = game.awayTeam || { name: 'TBD' }; const home = game.homeTeam || { name: 'TBD' };
+  const awayScore = scoreFor(game, 'away'); const homeScore = scoreFor(game, 'home');
 
   return (
-    <button
-      type="button"
-      className={`game-card game-card-minimal ${compact ? 'compact' : ''} ${isFeatured ? 'featured' : ''} ${isFinal ? 'final' : ''} ${isLive ? 'live' : ''} ${isStartingSoon ? 'starting-soon' : ''} ${isFavorite ? 'favorite-team-card' : ''} ${leagueAccents[game.leagueId] || 'accent-neutral'}`}
-      onClick={() => onOpen?.(game)}
-      aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}`}
-      data-priority-score={priorityScore}
-    >
+    <button type="button" className={`game-card game-card-minimal ${compact ? 'compact' : ''} ${isFeatured ? 'featured' : ''} ${isFinal ? 'final' : ''} ${isLive ? 'live' : ''} ${isStartingSoon ? 'starting-soon' : ''} ${isFavorite ? 'favorite-team-card' : ''} ${leagueAccents[game.leagueId] || 'accent-neutral'}`} onClick={() => onOpen?.(game)} aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}`} data-priority-score={priorityScore} data-watch-score={watchScore}>
       <div className="game-card-top">
         <span className="league-label">{league?.shortName || game.leagueId.toUpperCase()}</span>
         <div className="game-card-status-wrap">
           {isLive && <span className="live-dot" />}
           {isStartingSoon && <Clock3 size={12} className="starting-soon-icon" />}
           <span className="game-card-status">{statusLabel(game, isStartingSoon)}</span>
+          <span className={`watch-score watch-${watchLevel.label.toLowerCase()}`} title={`${watchLevel.label} watchability`}>{watchScore}</span>
           <PriorityIndicator game={game} />
         </div>
       </div>
-
       <div className="teams">
-        <div className="team-row">
-          <TeamMark team={away} size={isFeatured ? 'large' : 'medium'} />
-          <span>{teamLabel(away, game.leagueId)}</span>
-          {awayScore != null && <strong>{awayScore}</strong>}
-        </div>
-        <div className="team-row">
-          <TeamMark team={home} size={isFeatured ? 'large' : 'medium'} />
-          <span>{teamLabel(home, game.leagueId)}</span>
-          {homeScore != null && <strong>{homeScore}</strong>}
-        </div>
+        <div className="team-row"><TeamMark team={away} size={isFeatured ? 'large' : 'medium'} /><span>{teamLabel(away, game.leagueId)}</span>{awayScore != null && <strong>{awayScore}</strong>}</div>
+        <div className="team-row"><TeamMark team={home} size={isFeatured ? 'large' : 'medium'} /><span>{teamLabel(home, game.leagueId)}</span>{homeScore != null && <strong>{homeScore}</strong>}</div>
       </div>
     </button>
   );
