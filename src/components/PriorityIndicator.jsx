@@ -4,7 +4,7 @@ import { getPriorityLabel, getPriorityTier } from '../sports/priority.js';
 
 export function PriorityIndicator({ game }) {
   const tier = getPriorityTier(game);
-  const label = getPriorityLabel(game);
+  const label = getPriorityLabel(tier);
   const isFavorite = Boolean(game.homeTeam?.favorite || game.awayTeam?.favorite);
 
   if (tier > 4 && !isFavorite) return null;
