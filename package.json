@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "predev": "node scripts/fetch-favorite-logos.mjs",
     "build": "vite build",
+    "prebuild": "node scripts/fetch-favorite-logos.mjs",
     "preview": "vite preview",
     "test": "node src/sports/priority.test.js && node src/sports/selectors.test.js && node src/sports/adapters/normalizer.test.js && node src/sports/adapters/espn-standings.test.js && node src/sports/adapters/soccer-context.test.js"
   },
