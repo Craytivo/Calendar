@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Radio } from 'lucide-react';
 import { getMyGamesSections } from '../sports/selectors.js';
 import { GameCard } from './GameCard.jsx';
+import { GameDetailModal } from './GameDetailModal.jsx';
 
-function Section({ eyebrow, title, games, emptyMessage }) {
+function Section({ eyebrow, title, games, emptyMessage, onOpenGame }) {
   return (
     <section className="my-games-section">
       <div className="my-games-section-heading">
@@ -16,7 +17,7 @@ function Section({ eyebrow, title, games, emptyMessage }) {
 
       {games.length > 0 ? (
         <div className="my-games-cards">
-          {games.map((game) => <GameCard key={game.id} game={game} />)}
+          {games.map((game) => <GameCard key={game.id} game={game} onOpen={onOpenGame} />)}
         </div>
       ) : (
         <div className="section-empty">{emptyMessage}</div>
@@ -27,6 +28,7 @@ function Section({ eyebrow, title, games, emptyMessage }) {
 
 export function MyGamesView({ games, now }) {
   const { today, upcoming } = getMyGamesSections(games, now);
+  const [selectedGame, setSelectedGame] = useState(null);
   const liveGames = today.filter((game) => game.status === 'live');
   const hasGames = today.length > 0 || upcoming.length > 0;
 
@@ -54,6 +56,7 @@ export function MyGamesView({ games, now }) {
         eyebrow="Today"
         title="Today's Games"
         games={today}
+        onOpenGame={setSelectedGame}
         emptyMessage="No games from your category scope today."
       />
 
@@ -61,8 +64,11 @@ export function MyGamesView({ games, now }) {
         eyebrow="Next 6 Days"
         title="Next Week"
         games={upcoming}
+        onOpenGame={setSelectedGame}
         emptyMessage="No games from your category scope in the next six days."
       />
+
+      <GameDetailModal game={selectedGame} onClose={() => setSelectedGame(null)} />
     </div>
   );
 }
