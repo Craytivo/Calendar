@@ -313,7 +313,7 @@ export function runPriorityChecks() {
   ];
 
   const majorOnly = expectedTop.filter((game) => isMajorGameForPriority(game));
-  assert(majorOnly.length === 10, `Expected 10 strict major fixtures, got ${majorOnly.length}`);
+  assert(majorOnly.length === 11, `Expected 11 strict major fixtures, got ${majorOnly.length}`);
 
   return true;
 }
