@@ -6,6 +6,7 @@ const teamIdentity = {
   'real-madrid': { label: 'RMA', color: '#1F4E8C' },
   tottenham: { label: 'TOT', color: '#132257' },
   'blue-jays': { label: 'TOR', color: '#134A8E' },
+  dodgers: { label: 'LAD', color: '#005A9C' },
   oilers: { label: 'EDM', color: '#FF4C00' },
   vikings: { label: 'MIN', color: '#4F2683' },
 };
@@ -16,6 +17,7 @@ const favoriteLogoPaths = {
   'real-madrid': '/team-logos/real-madrid.png',
   tottenham: '/team-logos/tottenham.png',
   'blue-jays': '/team-logos/blue-jays.png',
+  dodgers: '/team-logos/dodgers.png',
   oilers: '/team-logos/oilers.png',
   vikings: '/team-logos/vikings.png',
 };
@@ -43,9 +45,7 @@ const collegeShortNames = {
   'Oregon State Beavers': 'Oregon St.',
 };
 
-function normalizedName(name = '') {
-  return String(name).trim().replace(/\s+/g, ' ');
-}
+function normalizedName(name = '') { return String(name).trim().replace(/\s+/g, ' '); }
 
 export function getTeamAbbreviation(team) {
   const name = normalizedName(team?.name);
@@ -53,7 +53,6 @@ export function getTeamAbbreviation(team) {
   if (collegeAbbreviations[name]) return collegeAbbreviations[name];
   const providerAbbr = normalizedName(team?.abbreviation);
   if (providerAbbr && providerAbbr.length <= 5 && providerAbbr !== name) return providerAbbr.toUpperCase();
-
   const words = name.replace(/[^a-zA-Z0-9 ]/g, '').split(' ').filter(Boolean);
   if (!words.length) return 'TBD';
   if (words.length === 1) return words[0].slice(0, 4).toUpperCase();
@@ -78,18 +77,11 @@ export function TeamMark({ team, size = 'medium' }) {
   const localLogoPath = getLocalLogoPath(team);
   const [imageFailed, setImageFailed] = useState(false);
 
-  useEffect(() => {
-    setImageFailed(false);
-  }, [localLogoPath]);
-
+  useEffect(() => { setImageFailed(false); }, [localLogoPath]);
   const showLogo = Boolean(localLogoPath) && !imageFailed;
 
   return (
-    <span
-      className={`team-mark ${size} ${showLogo ? 'has-logo' : ''}`}
-      style={{ '--team-color': color }}
-      aria-label={`${team?.name || 'Team'} ${showLogo ? 'logo' : 'abbreviation'}`}
-    >
+    <span className={`team-mark ${size} ${showLogo ? 'has-logo' : ''}`} style={{ '--team-color': color }} aria-label={`${team?.name || 'Team'} ${showLogo ? 'logo' : 'abbreviation'}`}>
       {showLogo ? (
         <img src={localLogoPath} alt="" aria-hidden="true" loading="lazy" decoding="async" onError={() => setImageFailed(true)} />
       ) : (
