@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 const teamIdentity = {
   'sac-kings': { label: 'SAC', color: '#5A2D81' },
@@ -56,14 +56,28 @@ export function TeamMark({ team, size = 'medium' }) {
   const identity = teamIdentity[team?.id];
   const color = team?.color || team?.primaryColor || team?.teamColor || identity?.color || '#64748b';
   const label = getTeamAbbreviation(team);
+  const logoUrl = normalizedName(team?.logoUrl);
+  const [imageFailed, setImageFailed] = useState(false);
+  const showLogo = Boolean(logoUrl) && !imageFailed;
 
   return (
     <span
-      className={`team-mark ${size}`}
+      className={`team-mark ${size} ${showLogo ? 'has-logo' : ''}`}
       style={{ '--team-color': color }}
       aria-label={`${team?.name || 'Team'} logo mark`}
     >
-      <span>{label}</span>
+      {showLogo ? (
+        <img
+          src={logoUrl}
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <span>{label}</span>
+      )}
     </span>
   );
 }
