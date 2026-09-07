@@ -48,10 +48,19 @@ function isMustSeeGame(game) {
   return gameHasTeam(game, mustSeeTeamIds);
 }
 
+function isMajorEvent(game) {
+  return (
+    game.isMajorEvent === true ||
+    game.eventType === 'championship' ||
+    game.eventType === 'final'
+  );
+}
+
 function isDisplayableMyGame(game) {
   return (
     isFavoriteGame(game) ||
     isMustSeeGame(game) ||
+    isMajorEvent(game) ||
     isMajorGameForPriority(game) ||
     isMajorUclGameForPriority(game) ||
     (game.leagueId === 'ufc' && game.eventType === 'main-card')
@@ -63,7 +72,10 @@ function isLive(game) {
 }
 
 function isNonFavoriteMajor(game) {
-  return !isFavoriteGame(game) && isMajorGameForPriority(game);
+  return !isFavoriteGame(game) && (
+    isMajorEvent(game) ||
+    isMajorGameForPriority(game)
+  );
 }
 
 function isNonFavoriteMajorUcl(game) {
@@ -120,8 +132,8 @@ export function getMyGamesWindow(games, now = new Date()) {
 /**
  * Builds the actual My Games set.
  *
- * Every favorite-team game is retained. Non-favorite major games are capped
- * at three PER CALENDAR DAY, not three across the whole eight-day window.
+ * Every favorite-team game is retained. Non-favorite major events/games are
+ * capped at three PER CALENDAR DAY, not three across the whole eight-day window.
  */
 export function getMyGames(games, now = new Date()) {
   const windowGames = getMyGamesWindow(games, now);
