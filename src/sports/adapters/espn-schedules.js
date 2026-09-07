@@ -1,6 +1,11 @@
 import { normalizeGames } from './normalizer.js';
 
 const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports';
+const ESPN_FALLBACK_BASE = 'https://site.web.api.espn.com/apis/site/v2/sports';
+const ESPN_HEADERS = {
+  Accept: 'application/json',
+  'User-Agent': 'Craytivo Sports Calendar/1.0',
+};
 
 const LEAGUE_CONFIG = {
   nfl: { sport: 'football', league: 'nfl' },
@@ -144,23 +149,41 @@ function mapEvent(event, leagueId) {
   };
 }
 
-async function fetchJson(url, attempt = 0) {
-  try {
-    const response = await fetch(url, { headers: { Accept: 'application/json' } });
-    if (!response.ok) {
-      if (attempt === 0 && response.status >= 500) {
-        await new Promise((resolve) => setTimeout(resolve, 250));
-        return fetchJson(url, 1);
-      }
-      throw new Error(`ESPN returned ${response.status}`);
-    }
-    return response.json();
-  } catch (error) {
-    if (attempt === 0) {
-      await new Promise((resolve) => setTimeout(resolve, 250));
-      return fetchJson(url, 1);
-    }
+function fallbackUrlFor(url) {
+  return url.replace('https://site.api.espn.com', 'https://site.web.api.espn.com');
+}
+
+function shouldTryFallback(error) {
+  return error?.status === 403 || error?.name === 'TypeError' || /Network connection lost|fetch failed/i.test(error?.message || '');
+}
+
+async function requestJson(url) {
+  const response = await fetch(url, { headers: ESPN_HEADERS });
+  if (!response.ok) {
+    const error = new Error(`ESPN returned ${response.status}`);
+    error.status = response.status;
     throw error;
+  }
+  return response.json();
+}
+
+async function fetchJson(url) {
+  try {
+    return await requestJson(url);
+  } catch (primaryError) {
+    if (!shouldTryFallback(primaryError)) throw primaryError;
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    try {
+      return await requestJson(fallbackUrlFor(url));
+    } catch (fallbackError) {
+      const error = new Error(
+        `${primaryError.message}; fallback ${fallbackError.message}`,
+      );
+      error.status = fallbackError.status || primaryError.status;
+      throw error;
+    }
   }
 }
 
