@@ -3,13 +3,14 @@ export const PRIORITY_TIERS = {
   MUST_SEE: 1,
   FAVORITE_TEAM: 2,
   MAJOR_EVENT: 3,
-  MAJOR_GAME: 4,
-  NORMAL: 5,
+  NFL_REGULAR: 4,
+  MAJOR_GAME: 5,
+  NORMAL: 6,
 };
 
 /**
- * A normalized team record. Keeping team IDs stable lets us replace mock
- * data with a live sports API later without rewriting the UI.
+ * A normalized team record. Keeping mock/provider IDs stable lets us replace
+ * data sources without rewriting the UI.
  */
 export const teams = [
   {
