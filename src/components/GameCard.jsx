@@ -3,7 +3,7 @@ import { Clock3, MapPin } from 'lucide-react';
 import { leagues } from '../sports/leagues.js';
 import { getPriorityTier } from '../sports/priority.js';
 import { PriorityIndicator } from './PriorityIndicator.jsx';
-import { TeamMark } from './TeamMark.jsx';
+import { TeamMark, getDisplayTeamName } from './TeamMark.jsx';
 
 const leagueAccents = {
   nfl: 'accent-neutral', nba: 'accent-blue', 'ncaa-football': 'accent-green',
@@ -19,6 +19,14 @@ function statusLabel(game) {
   if (game.status === 'live') return 'LIVE';
   if (game.status === 'final') return 'FINAL';
   return formatTime(game.startTime);
+}
+
+function teamLabel(team, leagueId) {
+  const name = getDisplayTeamName(team);
+  const ranking = leagueId === 'ncaa-football' && Number.isInteger(team?.ranking) && team.ranking > 0 && team.ranking <= 25
+    ? `#${team.ranking} `
+    : '';
+  return `${ranking}${name}`;
 }
 
 export function GameCard({ game, compact = false }) {
@@ -38,8 +46,16 @@ export function GameCard({ game, compact = false }) {
       </div>
       <div className="game-card-status">{isLive && <span className="live-dot" />}{statusLabel(game)}</div>
       <div className="teams">
-        <div className="team-row"><TeamMark team={away} size={isFeatured ? 'large' : 'medium'} /><span>{away.name}</span>{game.awayScore != null && <strong>{game.awayScore}</strong>}</div>
-        <div className="team-row"><TeamMark team={home} size={isFeatured ? 'large' : 'medium'} /><span>{home.name}</span>{game.homeScore != null && <strong>{game.homeScore}</strong>}</div>
+        <div className="team-row">
+          <TeamMark team={away} size={isFeatured ? 'large' : 'medium'} />
+          <span>{teamLabel(away, game.leagueId)}</span>
+          {game.awayScore != null && <strong>{game.awayScore}</strong>}
+        </div>
+        <div className="team-row">
+          <TeamMark team={home} size={isFeatured ? 'large' : 'medium'} />
+          <span>{teamLabel(home, game.leagueId)}</span>
+          {game.homeScore != null && <strong>{game.homeScore}</strong>}
+        </div>
       </div>
       {!compact && (
         <div className="game-meta">
