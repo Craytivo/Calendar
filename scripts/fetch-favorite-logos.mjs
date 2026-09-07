@@ -13,7 +13,10 @@ const favoriteLogos = {
   'real-madrid': { url: 'https://a.espncdn.com/i/teamlogos/soccer/500/86.png' },
   tottenham: { url: 'https://a.espncdn.com/i/teamlogos/soccer/500/367.png' },
   'blue-jays': { league: 'mlb', externalId: '14' },
-  dodgers: { league: 'mlb', externalId: '119' },
+  // ESPN's MLB team endpoint does not reliably expose the Dodgers logo through
+  // the /teams/:id response during Vercel builds. Use the canonical ESPN CDN
+  // asset directly so the required local favorite asset is deterministic.
+  dodgers: { url: 'https://a.espncdn.com/i/teamlogos/mlb/500/lad.png' },
   oilers: { url: 'https://a.espncdn.com/i/teamlogos/nhl/500/25.png' },
   vikings: { league: 'nfl', externalId: '16' },
 };
