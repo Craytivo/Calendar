@@ -9,8 +9,6 @@ const teamIdentity = {
   oilers: { label: 'EDM', color: '#FF4C00' },
 };
 
-// Favorite-team logos are downloaded into public/team-logos during the build.
-// They are intentionally local so the UI never depends on a remote logo CDN at runtime.
 const favoriteLogoPaths = {
   'sac-kings': '/team-logos/sac-kings.png',
   'oregon-ducks': '/team-logos/oregon-ducks.png',
@@ -67,7 +65,9 @@ export function TeamMark({ team, size = 'medium' }) {
   const identity = teamIdentity[team?.id];
   const color = team?.color || team?.primaryColor || team?.teamColor || identity?.color || '#64748b';
   const label = getTeamAbbreviation(team);
-  const localLogoPath = team?.favorite ? favoriteLogoPaths[team?.id] : undefined;
+  // Provider game objects do not necessarily carry favorite=true. The stable
+  // favorite team ID is therefore the source of truth for local logos.
+  const localLogoPath = favoriteLogoPaths[team?.id];
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
