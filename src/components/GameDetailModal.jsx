@@ -31,11 +31,20 @@ function formatCountdown(milliseconds) {
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m ${seconds}s`;
 }
-function getImportanceText(game) {
+function getImportanceReasons(game) {
   const reasons = getPriorityReasons(game);
-  if (reasons.length) return reasons.join(' · ');
-  if (game.leagueId === 'ucl') return detailValue(game.uclStage || game.round) || 'Champions League matchup';
-  return null;
+  if (reasons.length) return reasons;
+  if (game.leagueId === 'ucl') return [detailValue(game.uclStage || game.round) || 'Champions League matchup'];
+  return [];
+}
+function getImportanceSummary(game, reasons) {
+  if (reasons.length === 0) return null;
+  const tier = getPriorityTier(game);
+  if (tier === 0) return 'One of the highest-priority games on your calendar.';
+  if (tier === 1) return 'A must-see matchup based on your teams and sports priorities.';
+  if (tier === 2) return 'A favorite-team game that belongs near the top of your schedule.';
+  if (tier <= 3) return 'A high-signal event worth surfacing ahead of routine games.';
+  return 'This game is being surfaced because it has meaningful competitive context.';
 }
 function TeamPanel({ team, score, winner, live }) {
   return (
@@ -79,7 +88,8 @@ export function GameDetailModal({ game, onClose }) {
   const home = game.homeTeam || { name: 'TBD' };
   const awayWinner = isFinal && awayScore != null && homeScore != null && awayScore > homeScore;
   const homeWinner = isFinal && awayScore != null && homeScore != null && homeScore > awayScore;
-  const importance = getImportanceText(game);
+  const importanceReasons = getImportanceReasons(game);
+  const importanceSummary = getImportanceSummary(game, importanceReasons);
   const liveLabel = isLive ? 'Game in progress' : isFinal ? 'Game complete' : countdown > 0 ? `Starts in ${formatCountdown(countdown)}` : 'Starting now';
 
   const meta = [
@@ -114,12 +124,15 @@ export function GameDetailModal({ game, onClose }) {
             <TeamPanel team={home} score={homeScore} winner={homeWinner} live={isLive} />
           </div>
 
-          {importance && (
+          {importanceReasons.length > 0 && (
             <div className="game-detail-storyline">
               <div>
-                <span>Why it matters</span>
-                <strong>{importance}</strong>
-                <small>Priority {tier} · Signal {priorityScore}/100</small>
+                <span>Why this matters</span>
+                <strong>{importanceSummary}</strong>
+                <div className="game-detail-reasons">
+                  {importanceReasons.map((reason) => <span key={reason}>{reason}</span>)}
+                </div>
+                <small>Signal {priorityScore}/100</small>
               </div>
             </div>
           )}
