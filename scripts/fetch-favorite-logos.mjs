@@ -13,6 +13,7 @@ const favoriteLogos = {
   'real-madrid': { url: 'https://a.espncdn.com/i/teamlogos/soccer/500/86.png' },
   tottenham: { url: 'https://a.espncdn.com/i/teamlogos/soccer/500/367.png' },
   'blue-jays': { league: 'mlb', externalId: '14' },
+  dodgers: { league: 'mlb', externalId: '119' },
   oilers: { url: 'https://a.espncdn.com/i/teamlogos/nhl/500/25.png' },
   vikings: { league: 'nfl', externalId: '16' },
 };
@@ -44,7 +45,6 @@ for (const [leagueId, source] of Object.entries(leagueSources)) {
   try {
     const payload = await fetchJson(`${ESPN_BASE}/${source.sport}/${source.league}/teams?limit=100`);
     const teams = payload?.sports?.[0]?.leagues?.[0]?.teams?.map((entry) => entry.team).filter(Boolean) || [];
-
     if (!teams.length) throw new Error('no teams returned');
 
     for (const team of teams) {
@@ -66,14 +66,12 @@ for (const [leagueId, source] of Object.entries(leagueSources)) {
 for (const [teamId, favorite] of Object.entries(favoriteLogos)) {
   try {
     let logoUrl = favorite.url;
-
     if (!logoUrl) {
       const source = leagueSources[favorite.league];
       const payload = await fetchJson(`${ESPN_BASE}/${source.sport}/${source.league}/teams/${favorite.externalId}`);
       const team = payload?.team;
       logoUrl = team?.logos?.[0]?.href || team?.logo;
     }
-
     if (!logoUrl) throw new Error('no logo returned');
     await saveLogo(logoUrl, path.join(outputDir, `${teamId}.png`));
     console.log(`Saved local favorite logo: ${teamId}`);
