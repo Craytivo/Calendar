@@ -11,28 +11,29 @@ function leagueColor(leagueId) {
   return league?.color || '#64748b';
 }
 
-function formatDateKey(dateKey, options = {}) {
-  return new Date(`${dateKey}T12:00:00`).toLocaleDateString('en-US', options);
+function formatDate(date, options = {}) {
+  return date.toLocaleDateString('en-US', options);
 }
 
 function getDateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-export function CalendarView({ games, cursor, onShiftMonth }) {
-  const [selectedDateKey, setSelectedDateKey] = useState(null);
-  const year = cursor.getFullYear();
-  const month = cursor.getMonth();
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+function startOfWeek(date) {
+  const value = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  value.setDate(value.getDate() - value.getDay());
+  return value;
+}
 
-  const weeks = Math.ceil((firstDay + daysInMonth) / 7);
-  const startDate = new Date(year, month, 1 - firstDay);
-  const visibleDays = Array.from({ length: weeks * 7 }, (_, index) => {
-    const date = new Date(startDate);
-    date.setDate(startDate.getDate() + index);
-    return date;
-  });
+function addDays(date, days) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+}
+
+export function CalendarView({ games, cursor, onShiftWeek }) {
+  const [selectedDateKey, setSelectedDateKey] = useState(null);
+  const weekStart = startOfWeek(cursor);
+  const visibleDays = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+  const weekEnd = visibleDays[6];
 
   const gamesByDate = useMemo(() => {
     const grouped = new Map();
@@ -45,45 +46,62 @@ export function CalendarView({ games, cursor, onShiftMonth }) {
   }, [games]);
 
   const selectedGames = selectedDateKey ? (gamesByDate.get(selectedDateKey) || []) : [];
+  const totalGames = visibleDays.reduce((sum, date) => sum + (gamesByDate.get(getDateKey(date)) || []).length, 0);
+  const priorityGames = visibleDays.reduce((sum, date) => {
+    const dayGames = gamesByDate.get(getDateKey(date)) || [];
+    return sum + dayGames.filter((game) => game.priorityTier <= 2 || game.isMajorEvent).length;
+  }, 0);
 
   return (
     <section className="calendar-view">
       <div className="calendar-heading">
         <div>
-          <span className="eyebrow">7-day schedule</span>
-          <h2>{monthNames[month]} {year}</h2>
+          <span className="eyebrow">Visual weekly radar</span>
+          <h2>{formatDate(weekStart, { month: 'short', day: 'numeric' })} – {formatDate(weekEnd, { month: 'short', day: 'numeric', year: 'numeric' })}</h2>
+          <p className="calendar-subtitle">A quiet view of the week. Select a day to see the games.</p>
         </div>
         <div className="month-controls">
-          <button className="icon-button" onClick={() => onShiftMonth(-1)} aria-label="Previous week"><ChevronLeft size={18} /></button>
-          <button className="icon-button" onClick={() => onShiftMonth(1)} aria-label="Next week"><ChevronRight size={18} /></button>
+          <button className="icon-button" onClick={() => onShiftWeek(-1)} aria-label="Previous week"><ChevronLeft size={18} /></button>
+          <button className="icon-button" onClick={() => onShiftWeek(1)} aria-label="Next week"><ChevronRight size={18} /></button>
         </div>
+      </div>
+
+      <div className="calendar-radar-summary">
+        <div><strong>{totalGames}</strong><span>games</span></div>
+        <div><strong>{priorityGames}</strong><span>priority</span></div>
+        <div className="radar-legend"><span className="legend-dot priority" />Priority <span className="legend-dot live" />Live</div>
       </div>
 
       <div className="calendar-card">
         <div className="week-row">
-          {weekDays.map((day) => <div key={day}>{day}</div>)}
+          {visibleDays.map((date) => (
+            <div key={getDateKey(date)} className="week-day-label">
+              <span>{weekDays[date.getDay()]}</span>
+              <strong>{date.getDate()}</strong>
+            </div>
+          ))}
         </div>
         <div className="calendar-grid seven-day-grid">
           {visibleDays.map((date) => {
             const dateKey = getDateKey(date);
             const dayGames = gamesByDate.get(dateKey) || [];
-            const inMonth = date.getMonth() === month;
             const hasLive = dayGames.some((game) => game.status === 'live');
+            const hasPriority = dayGames.some((game) => game.priorityTier <= 2 || game.isMajorEvent);
 
             return (
               <button
                 type="button"
-                className={`day-cell ${!inMonth ? 'muted' : ''} ${hasLive ? 'has-live' : ''}`}
+                className={`day-cell ${hasLive ? 'has-live' : ''} ${hasPriority ? 'has-priority' : ''}`}
                 key={dateKey}
                 onClick={() => setSelectedDateKey(dateKey)}
-                aria-label={`${formatDateKey(dateKey, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}, ${dayGames.length} game${dayGames.length === 1 ? '' : 's'}`}
+                aria-label={`${formatDate(date, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}, ${dayGames.length} game${dayGames.length === 1 ? '' : 's'}`}
               >
                 <span className="day-number">{date.getDate()}</span>
                 {dayGames.length > 0 && (
                   <div className="game-dots" aria-hidden="true">
                     {dayGames.slice(0, 8).map((game) => (
                       <span
-                        className={`game-dot ${game.status === 'live' ? 'live' : ''}`}
+                        className={`game-dot ${game.status === 'live' ? 'live' : ''} ${game.priorityTier <= 2 || game.isMajorEvent ? 'priority' : ''}`}
                         key={game.id}
                         style={{ '--dot-color': leagueColor(game.leagueId) }}
                       />
@@ -91,16 +109,14 @@ export function CalendarView({ games, cursor, onShiftMonth }) {
                     {dayGames.length > 8 && <span className="game-dot-more">+{dayGames.length - 8}</span>}
                   </div>
                 )}
-                {dayGames.length > 0 && (
-                  <span className="day-game-count">{dayGames.length} {dayGames.length === 1 ? 'game' : 'games'}</span>
-                )}
+                <span className="day-game-count">{dayGames.length ? `${dayGames.length} ${dayGames.length === 1 ? 'game' : 'games'}` : 'No games'}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      <p className="calendar-note">Select any date to view its games and details.</p>
+      <p className="calendar-note">My Games stays focused on what matters. This radar shows the broader week at a glance.</p>
 
       {selectedDateKey && (
         <div className="calendar-modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setSelectedDateKey(null)}>
@@ -108,7 +124,7 @@ export function CalendarView({ games, cursor, onShiftMonth }) {
             <div className="calendar-modal-header">
               <div>
                 <span className="eyebrow">Game schedule</span>
-                <h3 id="calendar-modal-title">{formatDateKey(selectedDateKey, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h3>
+                <h3 id="calendar-modal-title">{formatDate(new Date(`${selectedDateKey}T12:00:00`), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h3>
                 <span className="calendar-modal-count">{selectedGames.length} {selectedGames.length === 1 ? 'game' : 'games'}</span>
               </div>
               <button className="icon-button" onClick={() => setSelectedDateKey(null)} aria-label="Close date details"><X size={18} /></button>
