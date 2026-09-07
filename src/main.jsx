@@ -37,19 +37,29 @@ function localDateKey(date) {
   }).format(new Date(date));
 }
 
+function statusRank(status) {
+  if (status === 'final') return 3;
+  if (status === 'live') return 2;
+  return 1;
+}
+
+function mergeGameUpdate(current, update) {
+  if (!current) return update;
+  const currentRank = statusRank(current.status);
+  const updateRank = statusRank(update.status);
+  if (updateRank < currentRank) return current;
+  return {
+    ...current,
+    ...update,
+    homeTeam: { ...current.homeTeam, ...update.homeTeam },
+    awayTeam: { ...current.awayTeam, ...update.awayTeam },
+  };
+}
+
 function mergeLiveGames(currentGames, liveGames) {
   if (!liveGames.length) return currentGames;
   const updates = new Map(liveGames.map((game) => [game.id, game]));
-  const merged = currentGames.map((game) => {
-    const update = updates.get(game.id);
-    if (!update) return game;
-    return {
-      ...game,
-      ...update,
-      homeTeam: { ...game.homeTeam, ...update.homeTeam },
-      awayTeam: { ...game.awayTeam, ...update.awayTeam },
-    };
-  });
+  const merged = currentGames.map((game) => mergeGameUpdate(game, updates.get(game.id)));
   const existingIds = new Set(currentGames.map((game) => game.id));
   return [...merged, ...liveGames.filter((game) => !existingIds.has(game.id))];
 }
@@ -57,13 +67,7 @@ function mergeLiveGames(currentGames, liveGames) {
 function mergeSelectedGame(current, liveGames) {
   if (!current) return current;
   const update = liveGames.find((game) => game.id === current.id);
-  if (!update) return current;
-  return {
-    ...current,
-    ...update,
-    homeTeam: { ...current.homeTeam, ...update.homeTeam },
-    awayTeam: { ...current.awayTeam, ...update.awayTeam },
-  };
+  return update ? mergeGameUpdate(current, update) : current;
 }
 
 function getLiveRefreshDelay(games, now = Date.now()) {
@@ -101,6 +105,10 @@ function App() {
   const [games, setGames] = useState([]);
   const gamesRef = useRef(games);
   gamesRef.current = games;
+  const liveGamesRef = useRef(new Map());
+  const calendarRequestRef = useRef(0);
+  const liveRequestRef = useRef(0);
+  const liveAbortRef = useRef(null);
   const [activeLeagues, setActiveLeagues] = useState(leagues.map((league) => league.id));
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -112,21 +120,25 @@ function App() {
   const [freshnessNow, setFreshnessNow] = useState(() => Date.now());
 
   const loadGames = async ({ silent = false } = {}) => {
+    const requestId = ++calendarRequestRef.current;
     if (!silent) setLoading(true);
     setError('');
     try {
       const response = await fetch(`/api/sports?days=7&timezone=${encodeURIComponent(viewerTimeZone)}`, { cache: 'no-store' });
       if (!response.ok) throw new Error('Sports data unavailable');
       const payload = await response.json();
+      if (requestId !== calendarRequestRef.current) return;
       const nextGames = payload.games ?? [];
-      setGames(nextGames);
+      const protectedLive = Array.from(liveGamesRef.current.values());
+      const mergedGames = mergeLiveGames(nextGames, protectedLive);
+      setGames(mergedGames);
       setDataHealth(payload.health ?? null);
       setLastUpdated(payload.fetchedAt ?? new Date().toISOString());
-      setSelectedGame((current) => current ? nextGames.find((game) => game.id === current.id) ?? current : current);
+      setSelectedGame((current) => current ? mergedGames.find((game) => game.id === current.id) ?? current : current);
     } catch (err) {
-      if (!silent || !gamesRef.current.length) setError(err.message || 'Unable to load sports data');
+      if (requestId === calendarRequestRef.current && (!silent || !gamesRef.current.length)) setError(err.message || 'Unable to load sports data');
     } finally {
-      if (!silent) setLoading(false);
+      if (requestId === calendarRequestRef.current && !silent) setLoading(false);
     }
   };
 
@@ -144,16 +156,25 @@ function App() {
 
   const loadLiveGames = async ({ silent = true } = {}) => {
     if (!todayLeagueQuery) return;
+    const requestId = ++liveRequestRef.current;
+    liveAbortRef.current?.abort();
+    const controller = new AbortController();
+    liveAbortRef.current = controller;
     try {
-      const response = await fetch(`/api/sports?mode=live&leagues=${encodeURIComponent(todayLeagueQuery)}&timezone=${encodeURIComponent(viewerTimeZone)}`, { cache: 'no-store' });
+      const response = await fetch(`/api/sports?mode=live&leagues=${encodeURIComponent(todayLeagueQuery)}&timezone=${encodeURIComponent(viewerTimeZone)}`, { cache: 'no-store', signal: controller.signal });
       if (!response.ok) throw new Error('Live sports data unavailable');
       const payload = await response.json();
+      if (requestId !== liveRequestRef.current || controller.signal.aborted) return;
       const liveGames = payload.games ?? [];
+      for (const game of liveGames) liveGamesRef.current.set(game.id, game);
       setGames((current) => mergeLiveGames(current, liveGames));
       setSelectedGame((current) => mergeSelectedGame(current, liveGames));
       setLastUpdated(payload.fetchedAt ?? new Date().toISOString());
     } catch (err) {
-      if (!silent) setError(err.message || 'Unable to load live sports data');
+      if (err?.name === 'AbortError') return;
+      if (requestId === liveRequestRef.current && !silent) setError(err.message || 'Unable to load live sports data');
+    } finally {
+      if (requestId === liveRequestRef.current && liveAbortRef.current === controller) liveAbortRef.current = null;
     }
   };
 
@@ -190,6 +211,7 @@ function App() {
     return () => {
       cancelled = true;
       if (timer) window.clearTimeout(timer);
+      liveAbortRef.current?.abort();
     };
   }, [todayLeagueQuery]);
 
