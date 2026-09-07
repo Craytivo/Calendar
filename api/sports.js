@@ -7,7 +7,12 @@ const API_BASE = 'https://www.thesportsdb.com/api/v1/json/123';
 const WINDOW_DAYS = 7;
 const SCHEDULE_CACHE_SECONDS = 60;
 const LIVE_CACHE_SECONDS = 20;
+const STANDINGS_CACHE_SECONDS = 600;
+const CIRCUIT_FAILURE_THRESHOLD = 3;
+const CIRCUIT_COOLDOWN_MS = 30_000;
 const memoryCache = new Map();
+const inflight = new Map();
+const circuitState = new Map();
 const ESPN_SCHEDULE_LEAGUES = ['nfl', 'nba', 'ncaa-football', 'mlb', 'nhl', 'ufc', 'epl', 'epl-cup', 'laliga', 'ucl'];
 const SOCCER_STANDING_LEAGUES = ['ucl', 'laliga', 'epl'];
 const STANDINGS_LEAGUES = new Set(['nfl', 'nba', 'ncaa-football', 'mlb', 'nhl']);
@@ -27,16 +32,45 @@ function todayInTimeZone(timeZone) {
 function seasonFor(leagueId, date) { const year = date.getUTCFullYear(); return ['epl', 'laliga', 'nba', 'nhl'].includes(leagueId) ? `${year}-${year + 1}` : String(year); }
 function inWindow(game, startKey, endKey) { const key = String(game.startTime).slice(0, 10); return key >= startKey && key < endKey; }
 function errorMessage(error) { return error instanceof Error ? error.message : String(error ?? 'Unknown error'); }
-function sourceRecord(id, name, provider, status, count = 0, error = null, durationMs = null, cached = false) { return { id, name, provider, status, count, ...(error ? { error } : {}), ...(Number.isFinite(durationMs) ? { durationMs } : {}), ...(cached ? { cached: true } : {}) }; }
+function sourceRecord(id, name, provider, status, count = 0, error = null, durationMs = null, cached = false, extra = {}) { return { id, name, provider, status, count, ...(error ? { error } : {}), ...(Number.isFinite(durationMs) ? { durationMs } : {}), ...(cached ? { cached: true } : {}), ...extra }; }
 function sourceName(leagueId) { const names = { 'ncaa-football': 'NCAA Football', 'epl-cup': 'Carabao Cup', epl: 'Premier League', laliga: 'La Liga', ucl: 'UEFA Champions League' }; return names[leagueId] || leagueId.toUpperCase(); }
+function circuitOpen(key) { const state = circuitState.get(key); return Boolean(state?.openedAt && Date.now() - state.openedAt < CIRCUIT_COOLDOWN_MS); }
+function recordFailure(key) { const state = circuitState.get(key) ?? { failures: 0, openedAt: 0 }; state.failures += 1; if (state.failures >= CIRCUIT_FAILURE_THRESHOLD) state.openedAt = Date.now(); circuitState.set(key, state); }
+function recordSuccess(key) { circuitState.delete(key); }
+
 async function cached(key, ttlSeconds, loader) {
+  const now = Date.now();
   const hit = memoryCache.get(key);
-  if (hit && hit.expiresAt > Date.now()) return { value: hit.value, cached: true, durationMs: 0 };
-  const started = Date.now();
-  const value = await loader();
-  memoryCache.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
-  return { value, cached: false, durationMs: Date.now() - started };
+  if (hit && hit.expiresAt > now) return { value: hit.value, cached: true, stale: false, refreshing: false, durationMs: 0, ageMs: now - hit.cachedAt };
+
+  if (circuitOpen(key)) {
+    if (hit?.value) return { value: hit.value, cached: true, stale: true, refreshing: false, circuitOpen: true, durationMs: 0, ageMs: now - hit.cachedAt };
+    throw new Error(`Provider temporarily paused for ${key}`);
+  }
+
+  const refresh = async () => {
+    if (inflight.has(key)) return inflight.get(key);
+    const started = Date.now();
+    const promise = Promise.resolve().then(loader).then((value) => {
+      memoryCache.set(key, { value, cachedAt: Date.now(), expiresAt: Date.now() + ttlSeconds * 1000 });
+      recordSuccess(key);
+      return { value, cached: false, stale: false, refreshing: false, durationMs: Date.now() - started, ageMs: 0 };
+    }).catch((error) => {
+      recordFailure(key);
+      if (hit?.value) return { value: hit.value, cached: true, stale: true, refreshing: false, circuitOpen: circuitOpen(key), durationMs: Date.now() - started, ageMs: Date.now() - hit.cachedAt, error: errorMessage(error) };
+      throw error;
+    }).finally(() => inflight.delete(key));
+    inflight.set(key, promise);
+    return promise;
+  };
+
+  if (hit?.value) {
+    void refresh().catch(() => {});
+    return { value: hit.value, cached: true, stale: true, refreshing: true, durationMs: 0, ageMs: now - hit.cachedAt };
+  }
+  return refresh();
 }
+
 async function getJson(url) {
   const started = Date.now();
   const response = await fetch(url);
@@ -77,7 +111,7 @@ export default async function handler(req, res) {
   const end = addDays(today, days);
   const startKey = dateKey(today), endKey = dateKey(end), requestStarted = Date.now();
   const games = [], sources = [];
-  const diagnostics = { timezone: timeZone, standings: [], favorites: [], timings: { totalMs: 0, scheduleMs: 0, standingsMs: 0, favoriteFallbackMs: 0 } };
+  const diagnostics = { timezone: timeZone, standings: [], favorites: [], timings: { totalMs: 0, scheduleMs: 0, standingsMs: 0, favoriteFallbackMs: 0 }, cache: { inflightDeduped: 0, staleRefreshes: 0, circuitOpen: 0 } };
 
   const scheduleStarted = Date.now();
   const scheduleResults = await Promise.allSettled(ESPN_SCHEDULE_LEAGUES.map(async (leagueId) => [leagueId, await cached(`schedule:${leagueId}:${startKey}:${days}`, SCHEDULE_CACHE_SECONDS, () => fetchEspnLeagueWindow(leagueId, today, days))]));
@@ -93,7 +127,9 @@ export default async function handler(req, res) {
         if (game.homeTeam?.favorite) coveredFavoriteIds.add(game.homeTeamId);
         if (game.awayTeam?.favorite) coveredFavoriteIds.add(game.awayTeamId);
       }
-      sources.push(sourceRecord(leagueId, sourceName(leagueId), 'ESPN public scoreboard', 'ok', normalized.length, null, cacheResult.durationMs, cacheResult.cached));
+      sources.push(sourceRecord(leagueId, sourceName(leagueId), 'ESPN public scoreboard', 'ok', normalized.length, cacheResult.error ?? null, cacheResult.durationMs, cacheResult.cached, { stale: cacheResult.stale, refreshing: cacheResult.refreshing, circuitOpen: cacheResult.circuitOpen }));
+      if (cacheResult.refreshing) diagnostics.cache.staleRefreshes += 1;
+      if (cacheResult.circuitOpen) diagnostics.cache.circuitOpen += 1;
     } else sources.push(sourceRecord(leagueId, sourceName(leagueId), 'ESPN public scoreboard', 'error', 0, errorMessage(result.reason)));
   });
 
@@ -107,20 +143,25 @@ export default async function handler(req, res) {
       const [, cacheResult] = result.value;
       const normalized = cacheResult.value.filter((game) => inWindow(game, startKey, endKey));
       games.push(...normalized);
-      diagnostics.favorites.push(sourceRecord(teamId, teamId, 'ESPN favorite-team fallback', 'ok', normalized.length, null, cacheResult.durationMs, cacheResult.cached));
+      diagnostics.favorites.push(sourceRecord(teamId, teamId, 'ESPN favorite-team fallback', 'ok', normalized.length, cacheResult.error ?? null, cacheResult.durationMs, cacheResult.cached, { stale: cacheResult.stale, refreshing: cacheResult.refreshing, circuitOpen: cacheResult.circuitOpen }));
+      if (cacheResult.refreshing) diagnostics.cache.staleRefreshes += 1;
+      if (cacheResult.circuitOpen) diagnostics.cache.circuitOpen += 1;
     } else diagnostics.favorites.push(sourceRecord(teamId, teamId, 'ESPN favorite-team fallback', 'error', 0, errorMessage(result.reason)));
   });
 
   const standingsStarted = Date.now();
-  const soccerLeagues = THESPORTSDB_LEAGUES.filter((league) => SOCCER_STANDING_LEAGUES.includes(league.id));
-  const tableResults = await Promise.allSettled(soccerLeagues.map(async (league) => [league.id, await cached(`soccer-standings:${league.id}:${seasonFor(league.id, today)}`, 600, () => fetchSoccerTable(league, today))]));
+  const activeSoccerIds = new Set(games.map((game) => game.leagueId));
+  const soccerLeagues = THESPORTSDB_LEAGUES.filter((league) => SOCCER_STANDING_LEAGUES.includes(league.id) && activeSoccerIds.has(league.id));
+  const tableResults = await Promise.allSettled(soccerLeagues.map(async (league) => [league.id, await cached(`soccer-standings:${league.id}:${seasonFor(league.id, today)}`, STANDINGS_CACHE_SECONDS, () => fetchSoccerTable(league, today))]));
   const tablesByLeague = {};
   tableResults.forEach((result, index) => {
     const league = soccerLeagues[index];
     if (result.status === 'fulfilled') {
       const [leagueId, cacheResult] = result.value;
       tablesByLeague[leagueId] = cacheResult.value;
-      diagnostics.standings.push(sourceRecord(leagueId, league.name, 'TheSportsDB standings', 'ok', cacheResult.value.length, null, cacheResult.durationMs, cacheResult.cached));
+      diagnostics.standings.push(sourceRecord(leagueId, league.name, 'TheSportsDB standings', 'ok', cacheResult.value.length, cacheResult.error ?? null, cacheResult.durationMs, cacheResult.cached, { stale: cacheResult.stale, refreshing: cacheResult.refreshing, circuitOpen: cacheResult.circuitOpen }));
+      if (cacheResult.refreshing) diagnostics.cache.staleRefreshes += 1;
+      if (cacheResult.circuitOpen) diagnostics.cache.circuitOpen += 1;
     } else diagnostics.standings.push(sourceRecord(league.id, league.name, 'TheSportsDB standings', 'error', 0, errorMessage(result.reason)));
   });
 
@@ -129,7 +170,7 @@ export default async function handler(req, res) {
     try {
       const result = await enrichGamesWithEspnStandings(enrichedGames, today.getUTCFullYear());
       enrichedGames = result;
-      diagnostics.standings.push(...(result.diagnostics ?? []).map((item) => sourceRecord(`espn-${item.leagueId}`, `${item.leagueId.toUpperCase()} standings`, item.provider, 'ok', item.count, null, item.durationMs, item.cached)));
+      diagnostics.standings.push(...(result.diagnostics ?? []).map((item) => sourceRecord(`espn-${item.leagueId}`, `${item.leagueId.toUpperCase()} standings`, item.provider, 'ok', item.count, null, item.durationMs, item.cached, { stale: item.stale, deduped: item.deduped, ageMs: item.ageMs })));
     } catch (error) {
       diagnostics.standings.push(sourceRecord('espn-major-sports', 'Major sports standings', 'ESPN standings', 'error', 0, errorMessage(error)));
     }
@@ -141,8 +182,8 @@ export default async function handler(req, res) {
   const scheduleErrors = sources.filter((source) => source.status === 'error');
   const hasLiveGames = uniqueGames.some((game) => game.status === 'live');
   diagnostics.timings.totalMs = Date.now() - requestStarted;
-  const cacheSeconds = hasLiveGames ? LIVE_CACHE_SECONDS : SCHEDULE_CACHE_SECONDS;
   const health = { status: scheduleErrors.length === ESPN_SCHEDULE_LEAGUES.length ? 'degraded' : 'ok', nfl: nflSource ? { status: nflSource.status, count: nflSource.count, ...(nflSource.error ? { error: nflSource.error } : {}) } : { status: 'missing', count: 0 }, failedSources: scheduleErrors.map((source) => source.id) };
+  const cacheSeconds = hasLiveGames ? LIVE_CACHE_SECONDS : SCHEDULE_CACHE_SECONDS;
   res.setHeader('Cache-Control', `s-maxage=${cacheSeconds}, stale-while-revalidate=${cacheSeconds}`);
   return res.status(200).json({ source: 'free-sports-aggregation', windowDays: days, startDate: startKey, endDateExclusive: endKey, fetchedAt: new Date().toISOString(), games: uniqueGames, sources, diagnostics, health });
 }
