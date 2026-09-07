@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { leagues } from '../sports/leagues.js';
 import { getPriorityTier } from '../sports/priority.js';
 import { GameCard } from './GameCard.jsx';
+import { GameDetailModal } from './GameDetailModal.jsx';
 
 const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -35,6 +36,7 @@ function isPriority(game) {
 
 export function CalendarView({ games, cursor, onShiftWeek }) {
   const [selectedDateKey, setSelectedDateKey] = useState(null);
+  const [selectedGame, setSelectedGame] = useState(null);
   const weekStart = startOfWeek(cursor);
   const visibleDays = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
   const weekEnd = visibleDays[6];
@@ -136,7 +138,7 @@ export function CalendarView({ games, cursor, onShiftWeek }) {
 
             {selectedGames.length > 0 ? (
               <div className="calendar-modal-games">
-                {selectedGames.map((game) => <GameCard key={game.id} game={game} />)}
+                {selectedGames.map((game) => <GameCard key={game.id} game={game} onOpen={setSelectedGame} />)}
               </div>
             ) : (
               <div className="calendar-modal-empty">No games scheduled for this date.</div>
@@ -144,6 +146,8 @@ export function CalendarView({ games, cursor, onShiftWeek }) {
           </div>
         </div>
       )}
+
+      <GameDetailModal game={selectedGame} onClose={() => setSelectedGame(null)} />
     </section>
   );
 }
