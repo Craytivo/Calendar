@@ -7,14 +7,7 @@ const API_BASE = 'https://www.thesportsdb.com/api/v1/json/123';
 const WINDOW_DAYS = 7;
 const CACHE_SECONDS = 60;
 
-const ESPN_SCHEDULE_LEAGUES = [
-  'nfl',
-  'nba',
-  'ncaa-football',
-  'mlb',
-  'nhl',
-  'ufc',
-];
+const ESPN_SCHEDULE_LEAGUES = ['nfl', 'nba', 'ncaa-football', 'mlb', 'nhl', 'ufc'];
 const SOCCER_LEAGUES = ['ucl', 'laliga', 'epl'];
 
 function addDays(date, days) { return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days); }
@@ -23,11 +16,13 @@ function seasonFor(leagueId, date) {
   const year = date.getFullYear();
   return ['epl', 'laliga', 'nba', 'nhl'].includes(leagueId) ? `${year}-${year + 1}` : String(year);
 }
+
 async function getJson(url) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`TheSportsDB returned ${response.status}`);
   return response.json();
 }
+
 async function fetchLeagueEvents(league) {
   const [nextResult, previousResult] = await Promise.all([
     getJson(`${API_BASE}/eventsnextleague.php?id=${league.providerId}`),
@@ -35,13 +30,13 @@ async function fetchLeagueEvents(league) {
   ]);
   return [...(nextResult.events ?? []), ...(previousResult.events ?? [])];
 }
+
 async function fetchSoccerTable(league, today) {
-  try {
-    const season = seasonFor(league.id, today);
-    const result = await getJson(`${API_BASE}/lookuptable.php?l=${league.providerId}&s=${encodeURIComponent(season)}`);
-    return result.table ?? [];
-  } catch { return []; }
+  const season = seasonFor(league.id, today);
+  const result = await getJson(`${API_BASE}/lookuptable.php?l=${league.providerId}&s=${encodeURIComponent(season)}`);
+  return result.table ?? [];
 }
+
 function applySoccerStandings(games, tablesByLeague) {
   return games.map((game) => {
     const table = tablesByLeague[game.leagueId];
@@ -69,9 +64,18 @@ function applySoccerStandings(games, tablesByLeague) {
     return { ...game, homeTeam: addRank(game.homeTeam), awayTeam: addRank(game.awayTeam) };
   });
 }
+
 function inWindow(game, startKey, endKey) {
   const key = String(game.startTime).slice(0, 10);
   return key >= startKey && key < endKey;
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error ?? 'Unknown error');
+}
+
+function sourceRecord(id, name, provider, status, count = 0, error = null) {
+  return { id, name, provider, status, count, ...(error ? { error } : {}) };
 }
 
 export default async function handler(req, res) {
@@ -84,74 +88,80 @@ export default async function handler(req, res) {
   const startKey = dateKey(today);
   const endKey = dateKey(end);
 
+  const games = [];
+  const sources = [];
+  const diagnostics = { standings: [] };
+
+  const espnResults = await Promise.allSettled(
+    ESPN_SCHEDULE_LEAGUES.map(async (leagueId) => [leagueId, await fetchEspnLeagueWindow(leagueId, today, days)]),
+  );
+
+  espnResults.forEach((result, index) => {
+    const leagueId = ESPN_SCHEDULE_LEAGUES[index];
+    if (result.status === 'fulfilled') {
+      const [, leagueGames] = result.value;
+      const normalized = leagueGames.filter((game) => inWindow(game, startKey, endKey));
+      games.push(...normalized);
+      sources.push(sourceRecord(leagueId, leagueId === 'ncaa-football' ? 'NCAA Football' : leagueId.toUpperCase(), 'ESPN public scoreboard', 'ok', normalized.length));
+    } else {
+      sources.push(sourceRecord(leagueId, leagueId === 'ncaa-football' ? 'NCAA Football' : leagueId.toUpperCase(), 'ESPN public scoreboard', 'error', 0, errorMessage(result.reason)));
+    }
+  });
+
+  const soccerLeagues = THESPORTSDB_LEAGUES.filter((league) => SOCCER_LEAGUES.includes(league.id));
+  const soccerResults = await Promise.allSettled(
+    soccerLeagues.map(async (league) => ({ league, events: await fetchLeagueEvents(league) })),
+  );
+
+  soccerResults.forEach((result, index) => {
+    const league = soccerLeagues[index];
+    if (result.status === 'fulfilled') {
+      const normalized = normalizeTheSportsDbEvents(result.value.events, league).filter((game) => inWindow(game, startKey, endKey));
+      games.push(...normalized);
+      sources.push(sourceRecord(league.id, league.name, 'TheSportsDB', 'ok', normalized.length));
+    } else {
+      sources.push(sourceRecord(league.id, league.name, 'TheSportsDB', 'error', 0, errorMessage(result.reason)));
+    }
+  });
+
+  const tableResults = await Promise.allSettled(
+    soccerLeagues.map(async (league) => [league.id, await fetchSoccerTable(league, today)]),
+  );
+  const tablesByLeague = {};
+  tableResults.forEach((result, index) => {
+    const league = soccerLeagues[index];
+    if (result.status === 'fulfilled') {
+      const [leagueId, table] = result.value;
+      tablesByLeague[leagueId] = table;
+      diagnostics.standings.push(sourceRecord(leagueId, league.name, 'TheSportsDB standings', 'ok', table.length));
+    } else {
+      diagnostics.standings.push(sourceRecord(league.id, league.name, 'TheSportsDB standings', 'error', 0, errorMessage(result.reason)));
+    }
+  });
+
+  let enrichedGames = games;
   try {
-    const games = [];
-    const sources = [];
-
-    const espnResults = await Promise.allSettled(
-      ESPN_SCHEDULE_LEAGUES.map(async (leagueId) => [leagueId, await fetchEspnLeagueWindow(leagueId, today, days)]),
-    );
-
-    espnResults.forEach((result, index) => {
-      const leagueId = ESPN_SCHEDULE_LEAGUES[index];
-      if (result.status === 'fulfilled') {
-        const [, leagueGames] = result.value;
-        const normalized = leagueGames.filter((game) => inWindow(game, startKey, endKey));
-        games.push(...normalized);
-        sources.push({
-          id: leagueId,
-          name: leagueId === 'ncaa-football' ? 'NCAA Football' : leagueId.toUpperCase(),
-          status: 'ok',
-          count: normalized.length,
-          provider: 'ESPN public scoreboard',
-        });
-      } else {
-        sources.push({
-          id: leagueId,
-          name: leagueId === 'ncaa-football' ? 'NCAA Football' : leagueId.toUpperCase(),
-          status: 'error',
-          count: 0,
-          provider: 'ESPN public scoreboard',
-        });
-      }
-    });
-
-    const soccerLeagues = THESPORTSDB_LEAGUES.filter((league) => SOCCER_LEAGUES.includes(league.id));
-    const soccerResults = await Promise.allSettled(
-      soccerLeagues.map(async (league) => ({ league, events: await fetchLeagueEvents(league) })),
-    );
-
-    soccerResults.forEach((result, index) => {
-      const league = soccerLeagues[index];
-      if (result.status === 'fulfilled') {
-        const normalized = normalizeTheSportsDbEvents(result.value.events, league).filter((game) => inWindow(game, startKey, endKey));
-        games.push(...normalized);
-        sources.push({ id: league.id, name: league.name, status: 'ok', count: normalized.length, provider: 'TheSportsDB' });
-      } else {
-        sources.push({ id: league.id, name: league.name, status: 'error', count: 0, provider: 'TheSportsDB' });
-      }
-    });
-
-    const tableResults = await Promise.all(soccerLeagues.map(async (league) => [league.id, await fetchSoccerTable(league, today)]));
-    const tablesByLeague = Object.fromEntries(tableResults);
     const withSoccerStandings = applySoccerStandings(games, tablesByLeague);
     const withDomesticRaceContext = applyDomesticSoccerRaceContext(withSoccerStandings);
-    const enrichedGames = await enrichGamesWithEspnStandings(withDomesticRaceContext, today.getFullYear());
-    const uniqueGames = Array.from(new Map(enrichedGames.map((game) => [game.id, game])).values())
-      .filter((game) => inWindow(game, startKey, endKey))
-      .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
-
-    res.setHeader('Cache-Control', `s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS}`);
-    return res.status(200).json({
-      source: 'free-sports-aggregation',
-      windowDays: days,
-      startDate: startKey,
-      endDateExclusive: endKey,
-      fetchedAt: new Date().toISOString(),
-      games: uniqueGames,
-      sources,
-    });
-  } catch {
-    return res.status(502).json({ source: 'free-sports-aggregation', error: 'Sports data sources unavailable' });
+    enrichedGames = await enrichGamesWithEspnStandings(withDomesticRaceContext, today.getFullYear());
+    diagnostics.standings.push(sourceRecord('espn-major-sports', 'Major sports standings', 'ESPN standings', 'ok'));
+  } catch (error) {
+    diagnostics.standings.push(sourceRecord('espn-major-sports', 'Major sports standings', 'ESPN standings', 'error', 0, errorMessage(error)));
   }
+
+  const uniqueGames = Array.from(new Map(enrichedGames.map((game) => [game.id, game])).values())
+    .filter((game) => inWindow(game, startKey, endKey))
+    .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+
+  res.setHeader('Cache-Control', `s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS}`);
+  return res.status(200).json({
+    source: 'free-sports-aggregation',
+    windowDays: days,
+    startDate: startKey,
+    endDateExclusive: endKey,
+    fetchedAt: new Date().toISOString(),
+    games: uniqueGames,
+    sources,
+    diagnostics,
+  });
 }
