@@ -6,6 +6,8 @@ import {
   sortGamesByPriority,
 } from './priority.js';
 
+const MY_GAMES_WINDOW_DAYS = 7;
+
 const favoriteTeamIds = new Set(
   teams.filter((team) => team.favorite).map((team) => team.id),
 );
@@ -102,10 +104,7 @@ function compareForDisplay(a, b) {
   return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
 }
 
-/**
- * Returns all games for a specific calendar date in local time.
- * Completed games remain included so the day can retain its final results.
- */
+/** Returns all games for a specific calendar date in local time. */
 export function getGamesForDate(games, date) {
   const start = startOfDay(date);
   const end = addDays(start, 1);
@@ -116,12 +115,11 @@ export function getGamesForDate(games, date) {
 }
 
 /**
- * Returns games in today's calendar date plus the following seven dates.
- * This is eight calendar dates total, including today.
+ * Returns games from today through the next six calendar dates: seven dates total.
  */
 export function getMyGamesWindow(games, now = new Date()) {
   const start = startOfDay(now);
-  const endExclusive = addDays(start, 8);
+  const endExclusive = addDays(start, MY_GAMES_WINDOW_DAYS);
 
   return games
     .filter((game) => isWithinRange(game, start, endExclusive))
@@ -130,10 +128,8 @@ export function getMyGamesWindow(games, now = new Date()) {
 }
 
 /**
- * Builds the actual My Games set.
- *
- * Every favorite-team game is retained. Non-favorite major events/games are
- * capped at three PER CALENDAR DAY, not three across the whole eight-day window.
+ * Builds the actual My Games set. Every favorite-team game is retained.
+ * Non-favorite major events/games are capped at three per calendar day.
  */
 export function getMyGames(games, now = new Date()) {
   const windowGames = getMyGamesWindow(games, now);
@@ -141,9 +137,7 @@ export function getMyGames(games, now = new Date()) {
 
   for (const game of windowGames) {
     const key = getLocalDateKey(new Date(game.startTime));
-    if (!byDate.has(key)) {
-      byDate.set(key, []);
-    }
+    if (!byDate.has(key)) byDate.set(key, []);
     byDate.get(key).push(game);
   }
 
@@ -155,7 +149,6 @@ export function getMyGames(games, now = new Date()) {
       (game) => isNonFavoriteMajor(game) || isNonFavoriteMajorUcl(game),
     );
     const selectedNonFavorites = sortGamesByPriority(nonFavoriteCandidates).slice(0, 3);
-
     selected.push(...favorites, ...selectedNonFavorites);
   }
 
@@ -166,37 +159,23 @@ export function getMyGames(games, now = new Date()) {
     .sort(compareForDisplay);
 }
 
-/**
- * Returns today's portion of My Games. Live games still rise to the top.
- */
 export function getTodayMyGames(games, now = new Date()) {
   const todayKey = getLocalDateKey(now);
-
   return getMyGames(games, now).filter(
     (game) => getLocalDateKey(new Date(game.startTime)) === todayKey,
   );
 }
 
-/**
- * Returns My Games across the complete today-plus-seven-days window.
- */
 export function getUpcomingMyGames(games, now = new Date()) {
   return getMyGames(games, now);
 }
 
-/**
- * Groups My Games by local calendar date for a future UI to render sections.
- */
 export function groupMyGamesByDate(games, now = new Date()) {
   const grouped = new Map();
 
   for (const game of getMyGames(games, now)) {
     const key = getLocalDateKey(new Date(game.startTime));
-
-    if (!grouped.has(key)) {
-      grouped.set(key, []);
-    }
-
+    if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key).push(game);
   }
 
@@ -206,3 +185,5 @@ export function groupMyGamesByDate(games, now = new Date()) {
 export function getPriorityForGame(game) {
   return getPriorityTier(game);
 }
+
+export { MY_GAMES_WINDOW_DAYS };
