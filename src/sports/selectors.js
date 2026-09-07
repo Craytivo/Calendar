@@ -105,8 +105,7 @@ export function getGamesForDate(games, date) {
 
 /**
  * Returns games in today's calendar date plus the following seven dates.
- * The selector intentionally keeps the full eight-day window independent of
- * UI concerns so the same result can power list, calendar, or future widgets.
+ * This is eight calendar dates total, including today.
  */
 export function getMyGamesWindow(games, now = new Date()) {
   const start = startOfDay(now);
@@ -122,19 +121,33 @@ export function getMyGamesWindow(games, now = new Date()) {
  * Builds the actual My Games set.
  *
  * Every favorite-team game is retained. Non-favorite major games are capped
- * at three across the eight-day window, selected by the priority engine.
+ * at three PER CALENDAR DAY, not three across the whole eight-day window.
  */
 export function getMyGames(games, now = new Date()) {
   const windowGames = getMyGamesWindow(games, now);
-  const favoriteGames = windowGames.filter(isFavoriteGame);
-  const nonFavoriteCandidates = windowGames.filter(
-    (game) => isNonFavoriteMajor(game) || isNonFavoriteMajorUcl(game),
-  );
+  const byDate = new Map();
 
-  const selectedNonFavorites = sortGamesByPriority(nonFavoriteCandidates).slice(0, 3);
-  const selectedIds = new Set(
-    [...favoriteGames, ...selectedNonFavorites].map((game) => game.id),
-  );
+  for (const game of windowGames) {
+    const key = getLocalDateKey(new Date(game.startTime));
+    if (!byDate.has(key)) {
+      byDate.set(key, []);
+    }
+    byDate.get(key).push(game);
+  }
+
+  const selected = [];
+
+  for (const dayGames of byDate.values()) {
+    const favorites = dayGames.filter(isFavoriteGame);
+    const nonFavoriteCandidates = dayGames.filter(
+      (game) => isNonFavoriteMajor(game) || isNonFavoriteMajorUcl(game),
+    );
+    const selectedNonFavorites = sortGamesByPriority(nonFavoriteCandidates).slice(0, 3);
+
+    selected.push(...favorites, ...selectedNonFavorites);
+  }
+
+  const selectedIds = new Set(selected.map((game) => game.id));
 
   return windowGames
     .filter((game) => selectedIds.has(game.id))
@@ -154,8 +167,6 @@ export function getTodayMyGames(games, now = new Date()) {
 
 /**
  * Returns My Games across the complete today-plus-seven-days window.
- * This is intentionally an alias-style selector for consumers that care about
- * upcoming calendar content rather than the historical name "window".
  */
 export function getUpcomingMyGames(games, now = new Date()) {
   return getMyGames(games, now);
