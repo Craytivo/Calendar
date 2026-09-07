@@ -10,6 +10,7 @@ import { ViewSwitcher } from './components/ViewSwitcher.jsx';
 import './styles.css';
 
 const favoriteTeamIds = new Set(['sac-kings', 'oregon-ducks', 'real-madrid', 'tottenham', 'blue-jays', 'oilers']);
+const viewerTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 function App() {
   const today = new Date();
@@ -27,7 +28,7 @@ function App() {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch('/api/sports?days=7');
+      const response = await fetch(`/api/sports?days=7&timezone=${encodeURIComponent(viewerTimeZone)}`);
       if (!response.ok) throw new Error('Sports data unavailable');
       const payload = await response.json();
       setGames(payload.games ?? []);
