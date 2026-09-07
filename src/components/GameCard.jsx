@@ -1,5 +1,4 @@
 import React from 'react';
-import { Clock3, MapPin } from 'lucide-react';
 import { leagues } from '../sports/leagues.js';
 import { getPriorityTier } from '../sports/priority.js';
 import { PriorityIndicator } from './PriorityIndicator.jsx';
@@ -44,18 +43,28 @@ export function GameCard({ game, compact = false, onOpen }) {
   const isFeatured = !compact && tier <= 1;
   const isFinal = game.status === 'final';
   const isLive = game.status === 'live';
+  const isFavorite = Boolean(game.homeTeam?.favorite || game.awayTeam?.favorite);
   const away = game.awayTeam || { name: 'TBD' };
   const home = game.homeTeam || { name: 'TBD' };
   const awayScore = scoreFor(game, 'away');
   const homeScore = scoreFor(game, 'home');
 
   return (
-    <button type="button" className={`game-card ${compact ? 'compact' : ''} ${isFeatured ? 'featured' : ''} ${isFinal ? 'final' : ''} ${isLive ? 'live' : ''} ${leagueAccents[game.leagueId] || 'accent-neutral'}`} onClick={() => onOpen?.(game)} aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}`}>
+    <button
+      type="button"
+      className={`game-card game-card-minimal ${compact ? 'compact' : ''} ${isFeatured ? 'featured' : ''} ${isFinal ? 'final' : ''} ${isLive ? 'live' : ''} ${isFavorite ? 'favorite-team-card' : ''} ${leagueAccents[game.leagueId] || 'accent-neutral'}`}
+      onClick={() => onOpen?.(game)}
+      aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}`}
+    >
       <div className="game-card-top">
         <span className="league-label">{league?.shortName || game.leagueId.toUpperCase()}</span>
-        <PriorityIndicator game={game} />
+        <div className="game-card-status-wrap">
+          {isLive && <span className="live-dot" />}
+          <span className="game-card-status">{statusLabel(game)}</span>
+          <PriorityIndicator game={game} />
+        </div>
       </div>
-      <div className="game-card-status">{isLive && <span className="live-dot" />}{statusLabel(game)}</div>
+
       <div className="teams">
         <div className="team-row">
           <TeamMark team={away} size={isFeatured ? 'large' : 'medium'} />
@@ -68,12 +77,6 @@ export function GameCard({ game, compact = false, onOpen }) {
           {homeScore != null && <strong>{homeScore}</strong>}
         </div>
       </div>
-      {!compact && (
-        <div className="game-meta">
-          <span><Clock3 size={13} /> {formatTime(game.startTime)}</span>
-          {game.venue && <span><MapPin size={13} /> {game.venue}</span>}
-        </div>
-      )}
     </button>
   );
 }
