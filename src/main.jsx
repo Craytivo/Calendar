@@ -5,6 +5,7 @@ import { getMyGames } from './sports/selectors.js';
 import { AppHeader } from './components/AppHeader.jsx';
 import { CalendarView } from './components/CalendarView.jsx';
 import { FilterSheet } from './components/FilterSheet.jsx';
+import { GameDetailModal } from './components/GameDetailModal.jsx';
 import { MyGamesView } from './components/MyGamesView.jsx';
 import { ViewSwitcher } from './components/ViewSwitcher.jsx';
 import './styles.css';
@@ -20,6 +21,7 @@ function App() {
   const [activeLeagues, setActiveLeagues] = useState(leagues.map((league) => league.id));
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [selectedGame, setSelectedGame] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [dataHealth, setDataHealth] = useState(null);
@@ -77,10 +79,12 @@ function App() {
       )}
 
       {view === 'my-games' ? (
-        <MyGamesView games={filteredMyGames} now={today} />
+        <MyGamesView games={filteredMyGames} now={today} onOpenGame={setSelectedGame} />
       ) : (
-        <CalendarView games={filteredGames} cursor={cursor} onShiftWeek={shiftWeek} />
+        <CalendarView games={filteredGames} cursor={cursor} onShiftWeek={shiftWeek} onOpenGame={setSelectedGame} />
       )}
+
+      <GameDetailModal game={selectedGame} onClose={() => setSelectedGame(null)} />
 
       <footer>
         <span>{loading ? 'Loading sports data…' : `${filteredMyGames.length} games in your 7-day view`}</span>
