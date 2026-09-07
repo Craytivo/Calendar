@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, MapPin, Radio, Tv, X } from 'lucide-react';
 import { leagues } from '../sports/leagues.js';
-import { getPriorityTier } from '../sports/priority.js';
+import { getPriorityReasons, getPriorityScore, getPriorityTier } from '../sports/priority.js';
 import { TeamMark, getDisplayTeamName } from './TeamMark.jsx';
 import './GameDetailModal.css';
 
@@ -11,7 +11,6 @@ function scoreFor(game, side) {
   const teamScore = side === 'away' ? game.awayTeam?.score : game.homeTeam?.score;
   return teamScore != null ? teamScore : null;
 }
-
 function statusLabel(game) {
   if (game.status === 'live') return 'LIVE NOW';
   if (game.status === 'final') return 'FINAL';
@@ -19,20 +18,9 @@ function statusLabel(game) {
   if (game.status === 'cancelled') return 'CANCELLED';
   return 'UPCOMING';
 }
-
-function detailValue(value) {
-  if (!value) return null;
-  return String(value).replace(/[-_]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function formatDate(startTime) {
-  return new Date(startTime).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
-}
-
-function formatTime(startTime) {
-  return new Date(startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
-
+function detailValue(value) { if (!value) return null; return String(value).replace(/[-_]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()); }
+function formatDate(startTime) { return new Date(startTime).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }); }
+function formatTime(startTime) { return new Date(startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
 function formatCountdown(milliseconds) {
   const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
   const days = Math.floor(totalSeconds / 86400);
@@ -43,23 +31,12 @@ function formatCountdown(milliseconds) {
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m ${seconds}s`;
 }
-
-function getImportanceText(game, tier) {
-  if (game.leagueId === 'ucl') {
-    if (game.isElimination || game.isTwoLegTie || game.uclStage) return detailValue(game.uclStage || game.round) || 'Champions League matchup';
-    return 'Champions League';
-  }
-  if (game.isDivisional) return 'Divisional matchup';
-  if (game.leagueId === 'ncaa-football' && game.homeTeam?.ranking && game.awayTeam?.ranking) return 'Top-25 matchup';
-  if (game.hasPlayoffImplications || game.hasSeedingImplications) return 'Playoff implications';
-  if (game.hasTitleOrUclQualificationImplications) return 'Title / qualification implications';
-  if (game.isElimination) return 'Elimination game';
-  if (game.eventType === 'championship' || game.eventType === 'final') return 'Championship';
-  if (game.eventType === 'main-card') return 'Main card';
-  if (tier <= 2) return 'Your team';
+function getImportanceText(game) {
+  const reasons = getPriorityReasons(game);
+  if (reasons.length) return reasons.join(' · ');
+  if (game.leagueId === 'ucl') return detailValue(game.uclStage || game.round) || 'Champions League matchup';
   return null;
 }
-
 function TeamPanel({ team, score, winner, live }) {
   return (
     <div className={`game-detail-team-panel ${winner ? 'winner' : ''}`}>
@@ -75,18 +52,13 @@ function TeamPanel({ team, score, winner, live }) {
 
 export function GameDetailModal({ game, onClose }) {
   const [now, setNow] = useState(() => Date.now());
-
   useEffect(() => {
     if (!game) return undefined;
     const onKeyDown = (event) => { if (event.key === 'Escape') onClose(); };
     document.addEventListener('keydown', onKeyDown);
     document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = '';
-    };
+    return () => { document.removeEventListener('keydown', onKeyDown); document.body.style.overflow = ''; };
   }, [game, onClose]);
-
   useEffect(() => {
     if (!game || game.status !== 'scheduled') return undefined;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -98,6 +70,7 @@ export function GameDetailModal({ game, onClose }) {
 
   const league = leagues.find((item) => item.id === game.leagueId);
   const tier = getPriorityTier(game);
+  const priorityScore = getPriorityScore(game);
   const awayScore = scoreFor(game, 'away');
   const homeScore = scoreFor(game, 'home');
   const isLive = game.status === 'live';
@@ -106,7 +79,7 @@ export function GameDetailModal({ game, onClose }) {
   const home = game.homeTeam || { name: 'TBD' };
   const awayWinner = isFinal && awayScore != null && homeScore != null && awayScore > homeScore;
   const homeWinner = isFinal && awayScore != null && homeScore != null && homeScore > awayScore;
-  const importance = getImportanceText(game, tier);
+  const importance = getImportanceText(game);
   const liveLabel = isLive ? 'Game in progress' : isFinal ? 'Game complete' : countdown > 0 ? `Starts in ${formatCountdown(countdown)}` : 'Starting now';
 
   const meta = [
@@ -121,9 +94,7 @@ export function GameDetailModal({ game, onClose }) {
       <div className={`game-detail-modal ${isLive ? 'is-live' : ''} ${isFinal ? 'is-final' : ''}`} role="dialog" aria-modal="true" aria-labelledby="game-detail-title">
         <div className="game-detail-hero">
           <header className="game-detail-header">
-            <div className="game-detail-league">
-              <span className="game-detail-eyebrow">{league?.shortName || game.leagueId.toUpperCase()}</span>
-            </div>
+            <div className="game-detail-league"><span className="game-detail-eyebrow">{league?.shortName || game.leagueId.toUpperCase()}</span></div>
             <button type="button" className="icon-button game-detail-close" onClick={onClose} aria-label="Close game details"><X size={18} /></button>
           </header>
 
@@ -145,7 +116,11 @@ export function GameDetailModal({ game, onClose }) {
 
           {importance && (
             <div className="game-detail-storyline">
-              <div><span>Why it matters</span><strong>{importance}</strong></div>
+              <div>
+                <span>Why it matters</span>
+                <strong>{importance}</strong>
+                <small>Priority {tier} · Signal {priorityScore}/100</small>
+              </div>
             </div>
           )}
         </div>
@@ -159,9 +134,7 @@ export function GameDetailModal({ game, onClose }) {
               </div>
             ))}
           </div>
-          <div className="game-detail-live-note">
-            {isLive ? <><Radio size={14} /> Live score</> : isFinal ? 'Final score' : liveLabel}
-          </div>
+          <div className="game-detail-live-note">{isLive ? <><Radio size={14} /> Live score</> : isFinal ? 'Final score' : liveLabel}</div>
         </div>
       </div>
     </div>
