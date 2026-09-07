@@ -5,12 +5,16 @@ import { applyDomesticSoccerRaceContext } from '../src/sports/adapters/soccer-co
 
 const API_BASE = 'https://www.thesportsdb.com/api/v1/json/123';
 const WINDOW_DAYS = 7;
-const CACHE_SECONDS = 900;
+const CACHE_SECONDS = 60;
 
-// ESPN is the schedule source for North American leagues and UFC because its
-// scoreboard endpoint can return an exact date range in one request. TheSportsDB
-// remains the soccer source where its competition context is more useful.
-const ESPN_SCHEDULE_LEAGUES = ['nfl', 'nba', 'ncaa-football', 'mlb', 'nhl', 'ufc'];
+const ESPN_SCHEDULE_LEAGUES = [
+  'nfl',
+  'nba',
+  'ncaa-football',
+  'mlb',
+  'nhl',
+  'ufc',
+];
 const SOCCER_LEAGUES = ['ucl', 'laliga', 'epl'];
 
 function addDays(date, days) { return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days); }
@@ -88,26 +92,37 @@ export default async function handler(req, res) {
       ESPN_SCHEDULE_LEAGUES.map(async (leagueId) => [leagueId, await fetchEspnLeagueWindow(leagueId, today, days)]),
     );
 
-    for (const result of espnResults) {
+    espnResults.forEach((result, index) => {
+      const leagueId = ESPN_SCHEDULE_LEAGUES[index];
       if (result.status === 'fulfilled') {
-        const [leagueId, leagueGames] = result.value;
+        const [, leagueGames] = result.value;
         const normalized = leagueGames.filter((game) => inWindow(game, startKey, endKey));
         games.push(...normalized);
-        sources.push({ id: leagueId, name: leagueId === 'ncaa-football' ? 'NCAA Football' : leagueId.toUpperCase(), status: 'ok', count: normalized.length, provider: 'ESPN public scoreboard' });
+        sources.push({
+          id: leagueId,
+          name: leagueId === 'ncaa-football' ? 'NCAA Football' : leagueId.toUpperCase(),
+          status: 'ok',
+          count: normalized.length,
+          provider: 'ESPN public scoreboard',
+        });
       } else {
-        const leagueId = ESPN_SCHEDULE_LEAGUES[sources.length] ?? 'unknown';
-        sources.push({ id: leagueId, name: leagueId.toUpperCase(), status: 'error', count: 0, provider: 'ESPN public scoreboard' });
+        sources.push({
+          id: leagueId,
+          name: leagueId === 'ncaa-football' ? 'NCAA Football' : leagueId.toUpperCase(),
+          status: 'error',
+          count: 0,
+          provider: 'ESPN public scoreboard',
+        });
       }
-    }
+    });
 
+    const soccerLeagues = THESPORTSDB_LEAGUES.filter((league) => SOCCER_LEAGUES.includes(league.id));
     const soccerResults = await Promise.allSettled(
-      THESPORTSDB_LEAGUES
-        .filter((league) => SOCCER_LEAGUES.includes(league.id))
-        .map(async (league) => ({ league, events: await fetchLeagueEvents(league) })),
+      soccerLeagues.map(async (league) => ({ league, events: await fetchLeagueEvents(league) })),
     );
 
     soccerResults.forEach((result, index) => {
-      const league = THESPORTSDB_LEAGUES.filter((item) => SOCCER_LEAGUES.includes(item.id))[index];
+      const league = soccerLeagues[index];
       if (result.status === 'fulfilled') {
         const normalized = normalizeTheSportsDbEvents(result.value.events, league).filter((game) => inWindow(game, startKey, endKey));
         games.push(...normalized);
@@ -117,7 +132,6 @@ export default async function handler(req, res) {
       }
     });
 
-    const soccerLeagues = THESPORTSDB_LEAGUES.filter((league) => SOCCER_LEAGUES.includes(league.id));
     const tableResults = await Promise.all(soccerLeagues.map(async (league) => [league.id, await fetchSoccerTable(league, today)]));
     const tablesByLeague = Object.fromEntries(tableResults);
     const withSoccerStandings = applySoccerStandings(games, tablesByLeague);
@@ -128,7 +142,15 @@ export default async function handler(req, res) {
       .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
 
     res.setHeader('Cache-Control', `s-maxage=${CACHE_SECONDS}, stale-while-revalidate=${CACHE_SECONDS}`);
-    return res.status(200).json({ source: 'free-sports-aggregation', windowDays: days, startDate: startKey, endDateExclusive: endKey, fetchedAt: new Date().toISOString(), games: uniqueGames, sources });
+    return res.status(200).json({
+      source: 'free-sports-aggregation',
+      windowDays: days,
+      startDate: startKey,
+      endDateExclusive: endKey,
+      fetchedAt: new Date().toISOString(),
+      games: uniqueGames,
+      sources,
+    });
   } catch {
     return res.status(502).json({ source: 'free-sports-aggregation', error: 'Sports data sources unavailable' });
   }
