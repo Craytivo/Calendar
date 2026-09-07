@@ -3,6 +3,7 @@ import { leagues } from '../sports/leagues.js';
 import { getPriorityTier } from '../sports/priority.js';
 import { PriorityIndicator } from './PriorityIndicator.jsx';
 import { TeamMark, getDisplayTeamName } from './TeamMark.jsx';
+import './GameCard.css';
 
 const leagueAccents = {
   nfl: 'accent-neutral', nba: 'accent-blue', 'ncaa-football': 'accent-green',
