@@ -8,10 +8,11 @@
     "predev": "node scripts/fetch-favorite-logos.mjs",
     "build": "vite build",
     "prebuild": "node scripts/fetch-favorite-logos.mjs",
-    "preview": "vite preview",
-    "test": "node src/sports/priority.test.js && node src/sports/selectors.test.js && node src/sports/adapters/normalizer.test.js && node src/sports/adapters/espn-standings.test.js && node src/sports/adapters/soccer-context.test.js",
+    "preview": "npm run build && wrangler dev",
+    "preview:cloudflare": "npm run build && wrangler dev",
+    "dev:cloudflare": "npm run build && wrangler dev",
     "deploy": "npm run build && wrangler deploy",
-    "preview:cloudflare": "npm run build && wrangler dev"
+    "test": "node src/sports/priority.test.js && node src/sports/selectors.test.js && node src/sports/adapters/normalizer.test.js && node src/sports/adapters/espn-standings.test.js && node src/sports/adapters/soccer-context.test.js"
   },
   "dependencies": {
     "@vitejs/plugin-react": "4.3.4",
