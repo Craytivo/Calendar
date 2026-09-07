@@ -1,5 +1,6 @@
 import { THESPORTSDB_LEAGUES, normalizeTheSportsDbEvents } from '../src/sports/adapters/thesportsdb.js';
 import { fetchEspnCollegeFootballWindow } from '../src/sports/adapters/espn-public.js';
+import { enrichGamesWithEspnStandings } from '../src/sports/adapters/espn-standings.js';
 
 const API_BASE = 'https://www.thesportsdb.com/api/v1/json/123';
 const WINDOW_DAYS = 7;
@@ -79,28 +80,30 @@ export default async function handler(req, res) {
       }
     });
 
-    const cfbCount = games.filter((game) => game.leagueId === 'ncaa-football').length;
-    if (cfbCount === 0) {
-      try {
-        const fallbackGames = await fetchEspnCollegeFootballWindow(today, days);
-        games.push(...fallbackGames.filter((game) => inWindow(game, startKey, endKey)));
-        const source = sources.find((item) => item.id === 'ncaa-football');
-        if (source) {
-          source.status = 'fallback';
-          source.name = 'ESPN public scoreboard fallback';
-          source.count = fallbackGames.length;
-        }
-      } catch {
-        const source = sources.find((item) => item.id === 'ncaa-football');
-        if (source) source.status = 'unavailable';
+    try {
+      const fallbackGames = await fetchEspnCollegeFootballWindow(today, days);
+      const fallbackInWindow = fallbackGames.filter((game) => inWindow(game, startKey, endKey));
+      const existingIds = new Set(games.filter((game) => game.leagueId === 'ncaa-football').map((game) => `${game.startTime}|${game.homeTeam?.name}|${game.awayTeam?.name}`));
+      for (const game of fallbackInWindow) {
+        const key = `${game.startTime}|${game.homeTeam?.name}|${game.awayTeam?.name}`;
+        if (!existingIds.has(key)) games.push(game);
       }
+      const source = sources.find((item) => item.id === 'ncaa-football');
+      if (source && fallbackInWindow.length) {
+        source.name = 'TheSportsDB + ESPN public enrichment';
+        source.status = source.status === 'ok' ? 'enriched' : 'fallback';
+        source.count = Math.max(source.count, fallbackInWindow.length);
+      }
+    } catch {
+      // TheSportsDB remains the source if the public ESPN CFB fallback is unavailable.
     }
 
     const soccerLeagues = THESPORTSDB_LEAGUES.filter((league) => ['epl', 'laliga', 'ucl'].includes(league.id));
     const tableResults = await Promise.all(soccerLeagues.map(async (league) => [league.id, await fetchSoccerTable(league, today)]));
     const tablesByLeague = Object.fromEntries(tableResults);
-    const withStandings = applySoccerStandings(games, tablesByLeague);
-    const uniqueGames = Array.from(new Map(withStandings.map((game) => [game.id, game])).values())
+    const withSoccerStandings = applySoccerStandings(games, tablesByLeague);
+    const enrichedGames = await enrichGamesWithEspnStandings(withSoccerStandings, today.getFullYear());
+    const uniqueGames = Array.from(new Map(enrichedGames.map((game) => [game.id, game])).values())
       .filter((game) => inWindow(game, startKey, endKey))
       .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
 
