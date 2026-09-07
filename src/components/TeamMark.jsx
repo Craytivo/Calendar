@@ -9,16 +9,15 @@ const teamIdentity = {
   oilers: { label: 'EDM', color: '#FF4C00' },
 };
 
-// Provider-independent fallbacks for the user's favorite teams.
-// If a live provider logo is missing or stale, the UI tries this saved logo before
-// falling all the way back to the colored abbreviation mark.
-const favoriteLogoUrls = {
-  'sac-kings': 'https://a.espncdn.com/i/teamlogos/nba/500/sac.png',
-  'oregon-ducks': 'https://a.espncdn.com/i/teamlogos/ncaa/500/2483.png',
-  'real-madrid': 'https://a.espncdn.com/i/teamlogos/soccer/500/86.png',
-  tottenham: 'https://a.espncdn.com/i/teamlogos/soccer/500/367.png',
-  'blue-jays': 'https://a.espncdn.com/i/teamlogos/mlb/500/14.png',
-  oilers: 'https://a.espncdn.com/i/teamlogos/nhl/500/25.png',
+// Favorite-team logos are downloaded into public/team-logos during the build.
+// They are intentionally local so the UI never depends on a remote logo CDN at runtime.
+const favoriteLogoPaths = {
+  'sac-kings': '/team-logos/sac-kings.png',
+  'oregon-ducks': '/team-logos/oregon-ducks.png',
+  'real-madrid': '/team-logos/real-madrid.png',
+  tottenham: '/team-logos/tottenham.png',
+  'blue-jays': '/team-logos/blue-jays.png',
+  oilers: '/team-logos/oilers.png',
 };
 
 const collegeAbbreviations = {
@@ -68,41 +67,29 @@ export function TeamMark({ team, size = 'medium' }) {
   const identity = teamIdentity[team?.id];
   const color = team?.color || team?.primaryColor || team?.teamColor || identity?.color || '#64748b';
   const label = getTeamAbbreviation(team);
-  const providerLogoUrl = normalizedName(team?.logoUrl);
-  const savedLogoUrl = favoriteLogoUrls[team?.id];
-  const initialLogoUrl = providerLogoUrl || savedLogoUrl || '';
-  const [imageUrl, setImageUrl] = useState(initialLogoUrl);
+  const localLogoPath = team?.favorite ? favoriteLogoPaths[team?.id] : undefined;
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
-    setImageUrl(initialLogoUrl);
     setImageFailed(false);
-  }, [initialLogoUrl]);
+  }, [localLogoPath]);
 
-  const showLogo = Boolean(imageUrl) && !imageFailed;
-
-  const handleImageError = () => {
-    if (savedLogoUrl && imageUrl !== savedLogoUrl) {
-      setImageUrl(savedLogoUrl);
-      return;
-    }
-    setImageFailed(true);
-  };
+  const showLogo = Boolean(localLogoPath) && !imageFailed;
 
   return (
     <span
       className={`team-mark ${size} ${showLogo ? 'has-logo' : ''}`}
       style={{ '--team-color': color }}
-      aria-label={`${team?.name || 'Team'} logo mark`}
+      aria-label={`${team?.name || 'Team'} ${showLogo ? 'logo' : 'abbreviation'}`}
     >
       {showLogo ? (
         <img
-          src={imageUrl}
+          src={localLogoPath}
           alt=""
           aria-hidden="true"
           loading="lazy"
           decoding="async"
-          onError={handleImageError}
+          onError={() => setImageFailed(true)}
         />
       ) : (
         <span>{label}</span>
