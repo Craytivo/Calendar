@@ -51,17 +51,20 @@ const fixtureGames = [
   game('day-eight-outside-window', localDate(2026, 9, 15, 18), {
     isDivisional: true,
   }),
-  game('major-one', localDate(2026, 9, 9, 18), {
+  game('major-one', localDate(2026, 9, 12, 13), {
     isDivisional: true,
   }),
-  game('major-two', localDate(2026, 9, 10, 18), {
+  game('major-two', localDate(2026, 9, 12, 14), {
     eventType: 'championship',
   }),
-  game('major-three', localDate(2026, 9, 11, 18), {
+  game('major-three', localDate(2026, 9, 12, 15), {
     isElimination: true,
   }),
-  game('major-four', localDate(2026, 9, 12, 18), {
+  game('major-four', localDate(2026, 9, 12, 16), {
     hasPlayoffImplications: true,
+  }),
+  game('major-five', localDate(2026, 9, 12, 17), {
+    hasSeedingImplications: true,
   }),
 ];
 
@@ -78,7 +81,7 @@ export function runSelectorChecks() {
   assertIds(
     todayGames,
     ['today-live-major', 'today-favorite', 'today-normal'],
-    'date selector should retain today\'s completed/live/scheduled games and prioritize them',
+    'date selector should retain today\'s live/scheduled games and prioritize them',
   );
 
   const windowGames = getMyGamesWindow(fixtureGames, now);
@@ -102,14 +105,16 @@ export function runSelectorChecks() {
     'every favorite-team game inside the window should be retained',
   );
 
-  const selectedNonFavorites = myGames.filter(
-    (item) =>
-      !['today-favorite', 'day-seven-favorite'].includes(item.id) &&
-      item.id !== 'today-live-major',
+  const septemberTwelve = myGames.filter(
+    (item) => item.startTime === localDate(2026, 9, 12, 13).toISOString() ||
+      item.startTime === localDate(2026, 9, 12, 14).toISOString() ||
+      item.startTime === localDate(2026, 9, 12, 15).toISOString() ||
+      item.startTime === localDate(2026, 9, 12, 16).toISOString() ||
+      item.startTime === localDate(2026, 9, 12, 17).toISOString(),
   );
   assert(
-    selectedNonFavorites.length <= 3,
-    'My Games should cap non-favorite major games at three',
+    septemberTwelve.length === 3,
+    'My Games should cap non-favorite major games at three per calendar day',
   );
 
   assert(
@@ -128,6 +133,7 @@ export function runSelectorChecks() {
   assert(grouped.has('2026-09-07'), 'grouped My Games should include today');
   assert(grouped.has('2026-09-14'), 'grouped My Games should include day seven');
   assert(!grouped.has('2026-09-15'), 'grouped My Games should exclude day eight');
+  assert(grouped.get('2026-09-12').length === 3, 'grouped My Games should preserve the daily major-game cap');
 
   return true;
 }
