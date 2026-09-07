@@ -95,6 +95,15 @@ const fixtures = {
     startTime: '2026-09-15T18:00:00-06:00',
     eventType: 'regular-season',
   },
+  nflImplications: {
+    id: 'nfl-implications',
+    leagueId: 'nfl',
+    homeTeamId: 'nfl-a',
+    awayTeamId: 'nfl-b',
+    startTime: '2026-09-16T18:00:00-06:00',
+    eventType: 'regular-season',
+    hasPlayoffImplications: true,
+  },
   nbaQualifying: {
     id: 'nba-qualifying',
     leagueId: 'nba',
@@ -241,6 +250,13 @@ const fixtures = {
     competitionId: 'march-madness',
     round: 'sweet-16',
   },
+  majorEvent: {
+    id: 'major-event',
+    leagueId: 'nfl',
+    startTime: '2027-02-07T17:30:00-06:00',
+    eventType: 'regular-season',
+    isMajorEvent: true,
+  },
   championship: {
     id: 'championship',
     leagueId: 'nfl',
@@ -261,6 +277,7 @@ export function runPriorityChecks() {
   assertTier(fixtures.nflDivisional, PRIORITY_TIERS.MAJOR_GAME);
   assertTier(fixtures.nflStrongRecords, PRIORITY_TIERS.MAJOR_GAME);
   assertTier(fixtures.nflWeakRecords, PRIORITY_TIERS.NORMAL);
+  assertTier(fixtures.nflImplications, PRIORITY_TIERS.MAJOR_GAME);
 
   assertTier(fixtures.nbaQualifying, PRIORITY_TIERS.MAJOR_GAME);
   assertTier(fixtures.nbaRankedButBelowWinRate, PRIORITY_TIERS.NORMAL);
@@ -281,6 +298,7 @@ export function runPriorityChecks() {
   assertTier(fixtures.favoriteRivalry, PRIORITY_TIERS.FAVORITE_TEAM);
   assertTier(fixtures.marchMadnessEarly, PRIORITY_TIERS.NORMAL);
   assertTier(fixtures.marchMadnessSweet16, PRIORITY_TIERS.MAJOR_GAME);
+  assertTier(fixtures.majorEvent, PRIORITY_TIERS.MAJOR_EVENT);
   assertTier(fixtures.championship, PRIORITY_TIERS.MAJOR_EVENT);
 
   const favoriteOrdinary = {
@@ -296,9 +314,38 @@ export function runPriorityChecks() {
     'Favorite-team rivalry should outrank an ordinary favorite-team game',
   );
 
+  const favoriteVsMajor = {
+    ...favoriteOrdinary,
+    id: 'favorite-vs-major',
+    leagueId: 'nhl',
+    startTime: '2026-11-20T19:00:00-06:00',
+  };
+  const majorNfl = {
+    ...fixtures.nflDivisional,
+    id: 'major-nfl',
+    startTime: '2026-11-20T20:00:00-06:00',
+  };
+  const favoriteFirst = sortGamesByPriority([majorNfl, favoriteVsMajor]);
+  assert(
+    favoriteFirst[0].id === favoriteVsMajor.id,
+    'Favorite-team games must outrank non-favorite major games',
+  );
+
+  const sameTierDifferentLeagues = [
+    { ...fixtures.nhlImplications, id: 'nhl-major-order' },
+    { ...fixtures.nflImplications, id: 'nfl-major-order' },
+    { ...fixtures.eplTopFive, id: 'epl-major-order' },
+  ];
+  const leagueOrdered = sortGamesByPriority(sameTierDifferentLeagues);
+  assert(
+    leagueOrdered.map((game) => game.id).join(',') === 'nfl-major-order,epl-major-order,nhl-major-order',
+    'League hierarchy should break equal-priority ties before time',
+  );
+
   const strictMajorFixtures = [
     fixtures.nflDivisional,
     fixtures.nflStrongRecords,
+    fixtures.nflImplications,
     fixtures.nbaQualifying,
     fixtures.ncaaRanked,
     fixtures.eplTopFive,
@@ -306,10 +353,11 @@ export function runPriorityChecks() {
     fixtures.mlbImplications,
     fixtures.nhlImplications,
     fixtures.marchMadnessSweet16,
+    fixtures.majorEvent,
     fixtures.championship,
   ];
 
-  assert(strictMajorFixtures.filter((game) => isMajorGameForPriority(game)).length === 10, 'All strict major fixtures should qualify');
+  assert(strictMajorFixtures.filter((game) => isMajorGameForPriority(game)).length === 12, 'All strict major fixtures should qualify');
 
   return true;
 }
