@@ -33,6 +33,15 @@ export function normalizeUclStage(raw = {}, startTime) {
   return undefined;
 }
 
+export function inferUclLeg(raw = {}) {
+  const rawText = [raw.strEvent, raw.strEventAlternate, raw.strRound, raw.intRound]
+    .map(text)
+    .join(' ');
+  if (/\b(second|2nd)\s+leg\b/.test(rawText)) return 2;
+  if (/\b(first|1st)\s+leg\b/.test(rawText)) return 1;
+  return undefined;
+}
+
 export function isUclLeaguePhaseStage(stage) {
   return stage === 'league-phase';
 }
@@ -66,13 +75,13 @@ export function applyUclTieContext(games) {
     if (!tieKey) return game;
     const tieGames = [...groups.get(tieKey)].sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
     const legIndex = tieGames.findIndex((candidate) => candidate.id === game.id);
+    const leg = game.leg ?? (tieGames.length >= 2 && legIndex >= 0 ? legIndex + 1 : undefined);
+
     return {
       ...game,
       tieId: tieKey,
       isTwoLegTie: true,
-      ...(tieGames.length >= 2 && legIndex >= 0
-        ? { leg: legIndex + 1, isFirstLeg: legIndex === 0, isSecondLeg: legIndex === 1 }
-        : {}),
+      ...(leg !== undefined ? { leg, isFirstLeg: leg === 1, isSecondLeg: leg === 2 } : {}),
     };
   });
 }
