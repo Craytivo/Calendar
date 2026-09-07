@@ -12,43 +12,14 @@ function formatTime(startTime) { return new Date(startTime).toLocaleTimeString([
 function minutesUntil(startTime) { return Math.max(0, Math.ceil((new Date(startTime).getTime() - Date.now()) / 60000)); }
 function statusLabel(game, startingSoon) { if (game.status === 'live') return 'LIVE'; if (game.status === 'final') return 'FINAL'; if (game.status === 'postponed') return 'POSTPONED'; if (game.status === 'cancelled') return 'CANCELLED'; if (startingSoon) return `STARTS IN ${minutesUntil(game.startTime)}M`; return formatTime(game.startTime); }
 function teamLabel(team, leagueId) { const name = getDisplayTeamName(team); const ranking = leagueId === 'ncaa-football' && Number.isInteger(team?.ranking) && team.ranking > 0 && team.ranking <= 25 ? `#${team.ranking} ` : ''; return `${ranking}${name}`; }
-function scoreFor(game, side) { const topLevel = side === 'away' ? game.awayScore : game.homeScore; if (topLevel != null) return topLevel; const teamScore = side === 'away' ? game.awayTeam?.score : game.homeTeam?.score; return teamScore != null ? teamScore : null; }
-function scoreboardMeta(game) { const period = game.period != null ? `Q${game.period}` : ''; const clock = game.clock || ''; if (game.isOvertime) return period ? `${period} · OT` : 'OVERTIME'; if (period && clock) return `${period} · ${clock}`; return period || clock || ''; }
+function scoreboardMeta(game) { const clock = game.clock || ''; if (game.leagueId === 'mlb') { const inning = Number(game.period); if (Number.isFinite(inning) && inning > 0) return `${inning}${inning === 1 ? 'st' : inning === 2 ? 'nd' : inning === 3 ? 'rd' : 'th'} inning`; return ''; } const period = game.period != null ? `Q${game.period}` : ''; if (game.isOvertime) return period ? `${period} · OT` : 'OVERTIME'; if (period && clock) return `${period} · ${clock}`; return period || clock || ''; }
 
 export function GameCard({ game, compact = false, onOpen }) {
-  const league = leagues.find((item) => item.id === game.leagueId); const tier = getPriorityTier(game); const priorityScore = getPriorityScore(game);
-  const watchScore = getWatchScore(game); const watchLevel = getWatchLevel(watchScore); const isFeatured = !compact && tier <= 1;
-  const isFinal = game.status === 'final'; const isLive = game.status === 'live'; const isScored = (isLive || isFinal) && (game.homeScore != null || game.awayScore != null || game.homeTeam?.score != null || game.awayTeam?.score != null);
-  const isStartingSoon = game.status === 'scheduled' && minutesUntil(game.startTime) <= 60 && new Date(game.startTime).getTime() >= Date.now();
-  const isFavorite = Boolean(game.homeTeam?.favorite || game.awayTeam?.favorite); const away = game.awayTeam || { name: 'TBD' }; const home = game.homeTeam || { name: 'TBD' };
-  const awayScore = scoreFor(game, 'away'); const homeScore = scoreFor(game, 'home'); const meta = scoreboardMeta(game);
-  const awayWinner = isFinal && awayScore != null && homeScore != null && awayScore > homeScore; const homeWinner = isFinal && awayScore != null && homeScore != null && homeScore > awayScore;
-
-  return (
-    <button type="button" className={`game-card game-card-minimal ${isScored ? 'scoreboard-card' : ''} ${compact ? 'compact' : ''} ${isFeatured ? 'featured' : ''} ${isFinal ? 'final' : ''} ${isLive ? 'live' : ''} ${isStartingSoon ? 'starting-soon' : ''} ${isFavorite ? 'favorite-team-card' : ''} ${leagueAccents[game.leagueId] || 'accent-neutral'}`} onClick={() => onOpen?.(game)} aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}`} data-priority-score={priorityScore} data-watch-score={watchScore}>
-      <div className="game-card-top">
-        <span className="league-label">{league?.shortName || game.leagueId.toUpperCase()}</span>
-        <div className="game-card-status-wrap">
-          {isLive && <span className="live-dot" />}
-          {isStartingSoon && <Clock3 size={12} className="starting-soon-icon" />}
-          <span className="game-card-status">{statusLabel(game, isStartingSoon)}</span>
-          <span className={`watch-score watch-${watchLevel.label.toLowerCase()}`} title={`${watchLevel.label} watchability`}>{watchScore}</span>
-          <PriorityIndicator game={game} />
-        </div>
-      </div>
-
-      {isScored ? (
-        <div className="scoreboard-body">
-          <div className={`scoreboard-team ${awayWinner ? 'winner' : ''}`}><TeamMark team={away} size={isFeatured ? 'large' : 'medium'} /><div className="scoreboard-team-copy"><span>{teamLabel(away, game.leagueId)}</span>{awayWinner && <small>WINNER</small>}</div><strong>{awayScore ?? '—'}</strong></div>
-          <div className="scoreboard-divider"><span>{isLive ? 'LIVE' : 'FINAL'}</span>{meta && <small>{meta}</small>}</div>
-          <div className={`scoreboard-team ${homeWinner ? 'winner' : ''}`}><TeamMark team={home} size={isFeatured ? 'large' : 'medium'} /><div className="scoreboard-team-copy"><span>{teamLabel(home, game.leagueId)}</span>{homeWinner && <small>WINNER</small>}</div><strong>{homeScore ?? '—'}</strong></div>
-        </div>
-      ) : (
-        <div className="teams">
-          <div className="team-row"><TeamMark team={away} size={isFeatured ? 'large' : 'medium'} /><span>{teamLabel(away, game.leagueId)}</span>{awayScore != null && <strong>{awayScore}</strong>}</div>
-          <div className="team-row"><TeamMark team={home} size={isFeatured ? 'large' : 'medium'} /><span>{teamLabel(home, game.leagueId)}</span>{homeScore != null && <strong>{homeScore}</strong>}</div>
-        </div>
-      )}
-    </button>
-  );
+  const league = leagues.find((item) => item.id === game.leagueId); const tier = getPriorityTier(game); const priorityScore = getPriorityScore(game); const watchScore = getWatchScore(game); const watchLevel = getWatchLevel(watchScore); const isFeatured = !compact && tier <= 1;
+  const isFinal = game.status === 'final'; const isLive = game.status === 'live'; const isScored = (isLive || isFinal) && (game.homeScore != null || game.awayScore != null || game.homeTeam?.score != null || game.awayTeam?.score != null); const isStartingSoon = game.status === 'scheduled' && minutesUntil(game.startTime) <= 60 && new Date(game.startTime).getTime() >= Date.now(); const isFavorite = Boolean(game.homeTeam?.favorite || game.awayTeam?.favorite); const away = game.awayTeam || { name: 'TBD' }; const home = game.homeTeam || { name: 'TBD' }; const awayScore = scoreFor(game, 'away'); const homeScore = scoreFor(game, 'home'); const meta = scoreboardMeta(game); const awayWinner = isFinal && awayScore != null && homeScore != null && awayScore > homeScore; const homeWinner = isFinal && awayScore != null && homeScore != null && homeScore > awayScore;
+  return (<button type="button" className={`game-card game-card-minimal ${isScored ? 'scoreboard-card' : ''} ${compact ? 'compact' : ''} ${isFeatured ? 'featured' : ''} ${isFinal ? 'final' : ''} ${isLive ? 'live' : ''} ${isStartingSoon ? 'starting-soon' : ''} ${isFavorite ? 'favorite-team-card' : ''} ${leagueAccents[game.leagueId] || 'accent-neutral'}`} onClick={() => onOpen?.(game)} aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}`} data-priority-score={priorityScore} data-watch-score={watchScore}>
+    <div className="game-card-top"><span className="league-label">{league?.shortName || game.leagueId.toUpperCase()}</span><div className="game-card-status-wrap">{isLive && <span className="live-dot" />}{isStartingSoon && <Clock3 size={12} className="starting-soon-icon" />}<span className="game-card-status">{statusLabel(game, isStartingSoon)}</span><span className={`watch-score watch-${watchLevel.label.toLowerCase()}`} title={`${watchLevel.label} watchability`}>{watchScore}</span><PriorityIndicator game={game} /></div></div>
+    {isScored ? (<div className="scoreboard-body"><div className={`scoreboard-team ${awayWinner ? 'winner' : ''}`}><TeamMark team={away} size={isFeatured ? 'large' : 'medium'} /><div className="scoreboard-team-copy"><span>{teamLabel(away, game.leagueId)}</span>{awayWinner && <small>WINNER</small>}</div><strong>{awayScore ?? '—'}</strong></div><div className="scoreboard-divider"><span>{isLive ? 'LIVE' : 'FINAL'}</span>{meta && <small>{meta}</small>}</div><div className={`scoreboard-team ${homeWinner ? 'winner' : ''}`}><TeamMark team={home} size={isFeatured ? 'large' : 'medium'} /><div className="scoreboard-team-copy"><span>{teamLabel(home, game.leagueId)}</span>{homeWinner && <small>WINNER</small>}</div><strong>{homeScore ?? '—'}</strong></div></div>) : (<div className="teams"><div className="team-row"><TeamMark team={away} size={isFeatured ? 'large' : 'medium'} /><span>{teamLabel(away, game.leagueId)}</span></div><div className="team-row"><TeamMark team={home} size={isFeatured ? 'large' : 'medium'} /><span>{teamLabel(home, game.leagueId)}</span></div></div>)}
+  </button>);
 }
+function scoreFor(game, side) { const topLevel = side === 'away' ? game.awayScore : game.homeScore; if (topLevel != null) return topLevel; const teamScore = side === 'away' ? game.awayTeam?.score : game.homeTeam?.score; return teamScore != null ? teamScore : null; }
