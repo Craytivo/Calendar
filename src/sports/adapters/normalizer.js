@@ -64,46 +64,16 @@ export function normalizeTeamContext(raw = {}) {
   const team = raw.team ?? raw;
   const context = normalizeTeam(team);
 
-  const winPercentage = toNumber(firstDefined(
-    raw.winPercentage,
-    raw.winningPercentage,
-    raw.winPct,
-    team.winPercentage,
-    team.winningPercentage,
-    team.winPct,
-  ));
-
-  const gamesPlayed = toNumber(firstDefined(
-    raw.gamesPlayed,
-    raw.games,
-    team.gamesPlayed,
-    team.games,
-  ));
-
-  const conferenceRank = toNumber(firstDefined(
-    raw.conferenceRank,
-    raw.conferencePosition,
-    team.conferenceRank,
-    team.conferencePosition,
-  ));
-
-  const leagueRank = toNumber(firstDefined(
-    raw.leagueRank,
-    raw.standing,
-    raw.position,
-    team.leagueRank,
-    team.standing,
-    team.position,
-  ));
-
-  const ranking = toNumber(firstDefined(
-    raw.ranking,
-    raw.apRanking,
-    raw.rank,
-    team.ranking,
-    team.apRanking,
-    team.rank,
-  ));
+  const winPercentage = toNumber(firstDefined(raw.winPercentage, raw.winningPercentage, raw.winPct, team.winPercentage, team.winningPercentage, team.winPct));
+  const gamesPlayed = toNumber(firstDefined(raw.gamesPlayed, raw.games, team.gamesPlayed, team.games));
+  const conferenceRank = toNumber(firstDefined(raw.conferenceRank, raw.conferencePosition, team.conferenceRank, team.conferencePosition));
+  const leagueRank = toNumber(firstDefined(raw.leagueRank, raw.standing, raw.position, team.leagueRank, team.standing, team.position));
+  const ranking = toNumber(firstDefined(raw.ranking, raw.apRanking, raw.rank, team.ranking, team.apRanking, team.rank));
+  const wins = toNumber(firstDefined(raw.wins, team.wins));
+  const losses = toNumber(firstDefined(raw.losses, team.losses));
+  const ties = toNumber(firstDefined(raw.ties, team.ties));
+  const points = toNumber(firstDefined(raw.points, raw.leaguePoints, team.points, team.leaguePoints));
+  const goalDifference = toNumber(firstDefined(raw.goalDifference, raw.goalDiff, team.goalDifference, team.goalDiff));
 
   return {
     ...context,
@@ -112,6 +82,11 @@ export function normalizeTeamContext(raw = {}) {
     ...(conferenceRank !== undefined ? { conferenceRank } : {}),
     ...(leagueRank !== undefined ? { leagueRank } : {}),
     ...(ranking !== undefined ? { ranking } : {}),
+    ...(wins !== undefined ? { wins } : {}),
+    ...(losses !== undefined ? { losses } : {}),
+    ...(ties !== undefined ? { ties } : {}),
+    ...(points !== undefined ? { points } : {}),
+    ...(goalDifference !== undefined ? { goalDifference } : {}),
   };
 }
 
@@ -137,6 +112,12 @@ export function normalizeGame(raw = {}) {
     round: firstDefined(raw.round, raw.roundName),
     competitionId: firstDefined(raw.competitionId, raw.competition, raw.leagueId),
     competitionPhase: firstDefined(raw.competitionPhase, raw.phase),
+    uclStage: raw.uclStage,
+    tieId: raw.tieId,
+    isTwoLegTie: toBoolean(raw.isTwoLegTie),
+    leg: toNumber(raw.leg),
+    isFirstLeg: toBoolean(raw.isFirstLeg),
+    isSecondLeg: toBoolean(raw.isSecondLeg),
     isDivisional: toBoolean(raw.isDivisional),
     isElimination: toBoolean(raw.isElimination),
     isMajorEvent: toBoolean(raw.isMajorEvent),
@@ -160,11 +141,6 @@ export function normalizeGames(rawGames = []) {
 
 export function isNormalizedGame(game) {
   return Boolean(
-    game &&
-      game.id &&
-      game.leagueId &&
-      game.startTime &&
-      VALID_STATUSES.has(game.status) &&
-      VALID_EVENT_TYPES.has(game.eventType),
+    game && game.id && game.leagueId && game.startTime && VALID_STATUSES.has(game.status) && VALID_EVENT_TYPES.has(game.eventType),
   );
 }
