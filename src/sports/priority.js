@@ -22,11 +22,7 @@ function isNflMajorGame(game) {
   const strongRecords = bothTeamsMeet(game, (team) => typeof team.winPercentage === 'number' && team.winPercentage >= 0.667);
   return divisional || strongRecords || hasMeaningfulImplications(game);
 }
-
-function isNflRegularGame(game) {
-  return game.leagueId === 'nfl' && !isNflMajorGame(game) && !isUniversalMajorGame(game);
-}
-
+function isNflRegularGame(game) { return game.leagueId === 'nfl' && !isNflMajorGame(game) && !isUniversalMajorGame(game); }
 function isNbaMajorGame(game) {
   if (game.leagueId !== 'nba') return false;
   const enoughGamesPlayed = bothTeamsMeet(game, (team) => typeof team.gamesPlayed === 'number' && team.gamesPlayed >= 10);
@@ -56,6 +52,54 @@ export function getPriorityTier(game) {
 export function isMajorGameForPriority(game) { return isMajorGame(game); }
 export function isMajorUclGameForPriority(game) { return isMajorUclGame(game); }
 
+export function getPriorityScore(game) {
+  let score = 0;
+  if (isChampionship(game)) score += 80;
+  else if (isPlayoffOrPostseason(game)) score += 55;
+  if (isEliminationGame(game)) score += 35;
+  if (isKnockoutGame(game)) score += 30;
+  if (game.isMajorEvent === true) score += 25;
+  if (hasMeaningfulImplications(game)) score += 25;
+  if (game.hasTitleOrUclQualificationImplications === true) score += 30;
+  if (game.isDivisional === true) score += 20;
+  if (game.isRivalry === true && gameHasTeam(game, favoriteTeamIds)) score += 30;
+  if (game.leagueId === 'ncaa-football') {
+    const rankings = [game.homeTeam?.ranking, game.awayTeam?.ranking].filter((value) => Number.isFinite(value));
+    if (rankings.length === 2) score += Math.max(0, 26 - Math.max(...rankings));
+  }
+  if (game.leagueId === 'nba') {
+    const records = [game.homeTeam?.winPercentage, game.awayTeam?.winPercentage].filter((value) => Number.isFinite(value));
+    if (records.length === 2) score += Math.round(Math.max(...records) * 10);
+  }
+  if (game.leagueId === 'nfl') {
+    const records = [game.homeTeam?.winPercentage, game.awayTeam?.winPercentage].filter((value) => Number.isFinite(value));
+    if (records.length === 2) score += Math.round(Math.min(...records) * 20);
+  }
+  if (gameHasTeam(game, mustSeeTeamIds)) score += 60;
+  else if (gameHasTeam(game, favoriteTeamIds)) score += 40;
+  return Math.min(score, 100);
+}
+
+export function getPriorityReasons(game) {
+  const reasons = [];
+  if (isMajorUclGame(game)) {
+    if (gameHasTeam(game, realMadridTeamIds)) reasons.push('Real Madrid');
+    if (isKnockoutGame(game)) reasons.push('UCL knockout');
+    else if (isEliminationGame(game)) reasons.push('Elimination');
+  }
+  if (game.leagueId === 'ufc' && game.eventType === 'main-card') reasons.push('UFC main card');
+  if (gameHasTeam(game, mustSeeTeamIds)) reasons.push('Must-see team');
+  else if (gameHasTeam(game, favoriteTeamIds)) reasons.push('Favorite team');
+  if (game.isDivisional) reasons.push('Divisional matchup');
+  if (game.leagueId === 'ncaa-football' && Number.isFinite(game.homeTeam?.ranking) && Number.isFinite(game.awayTeam?.ranking)) reasons.push(`Top-25: #${game.homeTeam.ranking} vs #${game.awayTeam.ranking}`);
+  if (game.hasTitleOrUclQualificationImplications) reasons.push('Title / qualification race');
+  else if (game.hasPlayoffImplications || game.hasSeedingImplications) reasons.push('Playoff implications');
+  if (isChampionship(game)) reasons.push('Championship');
+  else if (isPlayoffOrPostseason(game)) reasons.push('Postseason');
+  if (isEliminationGame(game) && !reasons.includes('Elimination')) reasons.push('Elimination');
+  return [...new Set(reasons)].slice(0, 3);
+}
+
 export function getPriorityLabel(tier) {
   const labels = {
     [PRIORITY_TIERS.CHAMPIONS_LEAGUE]: 'Champions League',
@@ -81,6 +125,8 @@ export function sortGamesByPriority(games) {
   return [...games].sort((a, b) => {
     const tierDifference = getPriorityTier(a) - getPriorityTier(b);
     if (tierDifference !== 0) return tierDifference;
+    const scoreDifference = getPriorityScore(b) - getPriorityScore(a);
+    if (scoreDifference !== 0) return scoreDifference;
     const secondaryDifference = getSecondaryPriority(a) - getSecondaryPriority(b);
     if (secondaryDifference !== 0) return secondaryDifference;
     const leagueDifference = getLeaguePriority(a.leagueId) - getLeaguePriority(b.leagueId);
