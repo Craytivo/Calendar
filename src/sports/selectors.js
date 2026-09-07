@@ -1,9 +1,9 @@
 import { teams } from './types.js';
 import {
+  getPriorityScore,
   getPriorityTier,
   isMajorGameForPriority,
   isMajorUclGameForPriority,
-  sortGamesByPriority,
 } from './priority.js';
 
 const MY_GAMES_WINDOW_DAYS = 7;
@@ -94,6 +94,9 @@ function compareForDisplay(a, b) {
 
   const priorityDifference = getPriorityTier(a) - getPriorityTier(b);
   if (priorityDifference !== 0) return priorityDifference;
+
+  const scoreDifference = getPriorityScore(b) - getPriorityScore(a);
+  if (scoreDifference !== 0) return scoreDifference;
 
   return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
 }
