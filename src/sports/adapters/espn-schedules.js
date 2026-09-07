@@ -9,6 +9,10 @@ const LEAGUE_CONFIG = {
   mlb: { sport: 'baseball', league: 'mlb' },
   nhl: { sport: 'hockey', league: 'nhl' },
   ufc: { sport: 'mma', league: 'ufc' },
+  epl: { sport: 'soccer', league: 'eng.1' },
+  'epl-cup': { sport: 'soccer', league: 'eng.league_cup' },
+  laliga: { sport: 'soccer', league: 'esp.1' },
+  ucl: { sport: 'soccer', league: 'uefa.champions' },
 };
 
 const FAVORITE_TEAM_IDS = {
@@ -66,8 +70,7 @@ function eventTypeFor(event) {
   const seasonType = String(event?.season?.slug || event?.season?.type?.slug || '').toLowerCase();
   const typeText = [event?.type?.text, event?.type?.name, event?.status?.type?.name, seasonType].join(' ').toLowerCase();
   if (typeText.includes('championship') || typeText.includes('final')) return 'championship';
-  if (typeText.includes('playoff') || typeText.includes('postseason')) return 'playoff';
-  if (typeText.includes('elimination')) return 'elimination';
+  if (typeText.includes('playoff') || typeText.includes('postseason') || typeText.includes('knockout')) return 'playoff';
   if (competition?.type?.abbreviation === 'STD') return 'regular-season';
   return 'regular-season';
 }
@@ -91,10 +94,12 @@ function mapEvent(event, leagueId) {
   const homeTeam = teamFromCompetitor(home, leagueId);
   const awayTeam = teamFromCompetitor(away, leagueId);
   const scores = new Map(competitors.map((item) => [item.id, item.score]));
+  const isCup = leagueId === 'epl-cup';
+  const normalizedLeagueId = isCup ? 'epl' : leagueId;
 
   return {
     id: `espn:${leagueId}:${event.id}`,
-    leagueId,
+    leagueId: normalizedLeagueId,
     homeTeamId: homeTeam.id,
     awayTeamId: awayTeam.id,
     startTime: event.date,
@@ -104,8 +109,9 @@ function mapEvent(event, leagueId) {
     round: event?.week?.text || event?.season?.slug,
     competitionId: competition?.id || event?.id,
     competitionPhase: event?.season?.type?.slug,
-    isMajorEvent: Boolean(event?.league?.isTournament || event?.isPostseason),
+    isMajorEvent: Boolean(event?.league?.isTournament || event?.isPostseason || isCup),
     isElimination: Boolean(event?.isElimination),
+    ...(isCup ? { competitionName: 'Carabao Cup' } : {}),
     homeTeam: { ...homeTeam, ...(scores.get(home.id) != null ? { score: Number(scores.get(home.id)) } : {}) },
     awayTeam: { ...awayTeam, ...(scores.get(away.id) != null ? { score: Number(scores.get(away.id)) } : {}) },
   };
