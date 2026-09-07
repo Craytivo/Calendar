@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node src/sports/priority.test.js && node src/sports/selectors.test.js && node src/sports/adapters/normalizer.test.js"
+    "test": "node src/sports/priority.test.js && node src/sports/selectors.test.js && node src/sports/adapters/normalizer.test.js && node src/sports/adapters/espn-standings.test.js"
   },
   "dependencies": {
     "@vitejs/plugin-react": "4.3.4",
