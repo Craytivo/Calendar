@@ -50,6 +50,14 @@ export const teams = [
     favoriteTier: 'favorite',
   },
   {
+    id: 'dodgers',
+    name: 'Los Angeles Dodgers',
+    abbreviation: 'LAD',
+    leagueId: 'mlb',
+    favorite: true,
+    favoriteTier: 'favorite',
+  },
+  {
     id: 'oilers',
     name: 'Edmonton Oilers',
     abbreviation: 'EDM',
