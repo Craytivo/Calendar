@@ -1,3 +1,6 @@
+import { teams } from '../types.js';
+import { cleanTeamName, resolveCanonicalTeamId } from '../team-identity.js';
+
 const ESPN_STANDINGS = {
   nfl: { sport: 'football', league: 'nfl', seasonType: '2' },
   nba: { sport: 'basketball', league: 'nba', seasonType: '2' },
@@ -11,12 +14,7 @@ const ESPN_FALLBACK_BASE = 'https://site.web.api.espn.com/apis/v2/sports';
 const ESPN_HEADERS = { Accept: 'application/json', 'User-Agent': 'Craytivo Sports Calendar/1.0' };
 const STANDINGS_CACHE_SECONDS = 600;
 const standingsCache = new Map();
-
-const FAVORITE_TEAM_NAMES = {
-  'sacramento kings': 'sac-kings', oregon: 'oregon-ducks', 'oregon ducks': 'oregon-ducks',
-  'real madrid': 'real-madrid', tottenham: 'tottenham', 'tottenham hotspur': 'tottenham',
-  'toronto blue jays': 'blue-jays', 'edmonton oilers': 'oilers', 'los angeles dodgers': 'dodgers', dodgers: 'dodgers',
-};
+const standingsInflight = new Map();
 
 const NFL_DIVISIONS = {
   'buffalo bills': 'AFC East', 'miami dolphins': 'AFC East', 'new england patriots': 'AFC East', 'new york jets': 'AFC East',
@@ -29,7 +27,7 @@ const NFL_DIVISIONS = {
   'arizona cardinals': 'NFC West', 'los angeles rams': 'NFC West', 'san francisco 49ers': 'NFC West', 'seattle seahawks': 'NFC West',
 };
 
-function clean(value) { return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' '); }
+function clean(value) { return cleanTeamName(value); }
 function number(value) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : undefined; }
 function stat(entry, names) {
   const stats = entry.stats ?? [];
@@ -42,6 +40,7 @@ function stat(entry, names) {
 function normalizeEntry(entry, group) {
   const team = entry.team ?? {};
   const name = team.displayName ?? team.shortDisplayName ?? team.name ?? '';
+  const canonicalId = resolveCanonicalTeamId({ name, abbreviation: team.abbreviation });
   const wins = number(stat(entry, ['wins', 'win']));
   const losses = number(stat(entry, ['losses', 'loss']));
   const ties = number(stat(entry, ['ties', 'tie'])) ?? 0;
@@ -52,7 +51,25 @@ function normalizeEntry(entry, group) {
   const playoffSeed = number(stat(entry, ['playoffSeed', 'seed']));
   const gamesBehind = number(stat(entry, ['gamesBehind', 'gb']));
   const playoffStatus = clean(entry.note ?? entry.status?.name ?? entry.status?.type);
-  return { id: FAVORITE_TEAM_NAMES[clean(name)] ?? `espn:${team.id ?? clean(name)}`, providerId: team.id, name, abbreviation: team.abbreviation, wins, losses, ties, gamesPlayed, winPercentage, ranking: number(stat(entry, ['apRank', 'rank', 'pollRank', 'currentRank'])) ?? number(entry.rank), leagueRank: rank, conferenceRank: conferenceRank ?? playoffSeed, playoffSeed, gamesBehind, conference: group?.abbreviation ?? group?.name, division: clean(name) in NFL_DIVISIONS ? NFL_DIVISIONS[clean(name)] : group?.name, playoffStatus };
+  return {
+    id: canonicalId ?? `espn:${team.id ?? clean(name)}`,
+    providerId: team.id,
+    name,
+    abbreviation: team.abbreviation,
+    wins,
+    losses,
+    ties,
+    gamesPlayed,
+    winPercentage,
+    ranking: number(stat(entry, ['apRank', 'rank', 'pollRank', 'currentRank'])) ?? number(entry.rank),
+    leagueRank: rank,
+    conferenceRank: conferenceRank ?? playoffSeed,
+    playoffSeed,
+    gamesBehind,
+    conference: group?.abbreviation ?? group?.name,
+    division: NFL_DIVISIONS[clean(name)] ?? group?.name,
+    playoffStatus,
+  };
 }
 function getEntries(payload) { return (payload?.groups ?? []).flatMap((group) => (group.entries ?? []).map((entry) => normalizeEntry(entry, group))); }
 function isLateSeason(game) {
@@ -74,7 +91,8 @@ function significantPlayoffRace(game) {
 function enrichGame(game, standingsByName) {
   const lookup = (team) => {
     if (!team) return team;
-    const context = standingsByName.get(clean(team.name));
+    const canonicalId = resolveCanonicalTeamId(team);
+    const context = standingsByName.get(canonicalId) ?? standingsByName.get(clean(team.name));
     return context ? { ...team, ...context, id: team.id } : team;
   };
   const homeTeam = lookup(game.homeTeam), awayTeam = lookup(game.awayTeam);
@@ -111,13 +129,31 @@ function standingsUrl(leagueId, year) {
 async function getCachedStandings(leagueId, year) {
   const key = `standings:${leagueId}:${year}`;
   const hit = standingsCache.get(key);
-  if (hit && hit.expiresAt > Date.now()) return { entries: hit.entries, cached: true, durationMs: 0, provider: hit.provider };
-  const started = Date.now();
-  const fetched = await fetchJson(standingsUrl(leagueId, year));
-  const entries = getEntries(fetched.data);
-  const durationMs = Date.now() - started || fetched.durationMs;
-  standingsCache.set(key, { entries, provider: fetched.provider, expiresAt: Date.now() + STANDINGS_CACHE_SECONDS * 1000 });
-  return { entries, cached: false, durationMs, provider: fetched.provider };
+  if (hit && hit.expiresAt > Date.now()) return { entries: hit.entries, cached: true, stale: false, durationMs: 0, provider: hit.provider, ageMs: Date.now() - hit.cachedAt };
+  const existing = standingsInflight.get(key);
+  if (existing) {
+    const result = await existing;
+    return { ...result, cached: true, stale: false, durationMs: result.durationMs, deduped: true, ageMs: 0 };
+  }
+  const previous = hit;
+  const promise = (async () => {
+    try {
+      const started = Date.now();
+      const fetched = await fetchJson(standingsUrl(leagueId, year));
+      const entries = getEntries(fetched.data);
+      const durationMs = Date.now() - started || fetched.durationMs;
+      standingsCache.set(key, { entries, provider: fetched.provider, cachedAt: Date.now(), expiresAt: Date.now() + STANDINGS_CACHE_SECONDS * 1000 });
+      return { entries, cached: false, stale: false, durationMs, provider: fetched.provider, ageMs: 0 };
+    } finally {
+      standingsInflight.delete(key);
+    }
+  })();
+  standingsInflight.set(key, promise);
+  try { return await promise; }
+  catch (error) {
+    if (previous?.entries?.length) return { entries: previous.entries, cached: true, stale: true, durationMs: error.durationMs ?? 0, provider: previous.provider, ageMs: Date.now() - previous.cachedAt, error: error.message };
+    throw error;
+  }
 }
 
 export async function fetchEspnStandings(leagueId, year = new Date().getFullYear()) {
@@ -133,8 +169,13 @@ export async function enrichGamesWithEspnStandings(games, year = new Date().getF
   for (const result of results) {
     if (result.status !== 'fulfilled') continue;
     const [leagueId, standings] = result.value;
-    byLeague.set(leagueId, new Map(standings.entries.map((entry) => [clean(entry.name), entry])));
-    diagnostics.push({ leagueId, provider: standings.provider, cached: standings.cached, durationMs: standings.durationMs, count: standings.entries.length });
+    const lookup = new Map();
+    for (const entry of standings.entries) {
+      lookup.set(entry.id, entry);
+      lookup.set(clean(entry.name), entry);
+    }
+    byLeague.set(leagueId, lookup);
+    diagnostics.push({ leagueId, provider: standings.provider, cached: standings.cached, stale: standings.stale, deduped: standings.deduped ?? false, durationMs: standings.durationMs, ageMs: standings.ageMs ?? 0, count: standings.entries.length });
   }
   const enriched = games.map((game) => enrichGame(game, byLeague.get(game.leagueId) ?? new Map()));
   enriched.diagnostics = diagnostics;
