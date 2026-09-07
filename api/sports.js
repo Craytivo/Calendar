@@ -1,6 +1,7 @@
 import { THESPORTSDB_LEAGUES, normalizeTheSportsDbEvents } from '../src/sports/adapters/thesportsdb.js';
 import { fetchEspnCollegeFootballWindow } from '../src/sports/adapters/espn-public.js';
 import { enrichGamesWithEspnStandings } from '../src/sports/adapters/espn-standings.js';
+import { applyDomesticSoccerRaceContext } from '../src/sports/adapters/soccer-context.js';
 
 const API_BASE = 'https://www.thesportsdb.com/api/v1/json/123';
 const WINDOW_DAYS = 7;
@@ -39,12 +40,22 @@ function applySoccerStandings(games, tablesByLeague) {
     for (const row of table) {
       const name = String(row.name ?? row.strTeam ?? '').trim().toLowerCase();
       const rank = Number(row.intRank ?? row.intPosition ?? row.intStanding ?? row.position);
-      if (name && Number.isFinite(rank)) standings.set(name, rank);
+      if (!name || !Number.isFinite(rank)) continue;
+
+      const played = Number(row.intPlayed ?? row.intGamesPlayed ?? row.played);
+      const points = Number(row.intPoints ?? row.points);
+      const goalDifference = Number(row.intGoalDifference ?? row.intGoalDiff ?? row.goalDifference);
+      standings.set(name, {
+        leagueRank: rank,
+        ...(Number.isFinite(played) ? { gamesPlayed: played } : {}),
+        ...(Number.isFinite(points) ? { points } : {}),
+        ...(Number.isFinite(goalDifference) ? { goalDifference } : {}),
+      });
     }
     const addRank = (team) => {
       if (!team) return team;
-      const rank = standings.get(String(team.name ?? '').trim().toLowerCase());
-      return Number.isFinite(rank) ? { ...team, leagueRank: rank } : team;
+      const context = standings.get(String(team.name ?? '').trim().toLowerCase());
+      return context ? { ...team, ...context } : team;
     };
     return { ...game, homeTeam: addRank(game.homeTeam), awayTeam: addRank(game.awayTeam) };
   });
@@ -102,7 +113,8 @@ export default async function handler(req, res) {
     const tableResults = await Promise.all(soccerLeagues.map(async (league) => [league.id, await fetchSoccerTable(league, today)]));
     const tablesByLeague = Object.fromEntries(tableResults);
     const withSoccerStandings = applySoccerStandings(games, tablesByLeague);
-    const enrichedGames = await enrichGamesWithEspnStandings(withSoccerStandings, today.getFullYear());
+    const withDomesticRaceContext = applyDomesticSoccerRaceContext(withSoccerStandings);
+    const enrichedGames = await enrichGamesWithEspnStandings(withDomesticRaceContext, today.getFullYear());
     const uniqueGames = Array.from(new Map(enrichedGames.map((game) => [game.id, game])).values())
       .filter((game) => inWindow(game, startKey, endKey))
       .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
