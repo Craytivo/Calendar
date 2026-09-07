@@ -10,45 +10,23 @@ const teamIdentity = {
 };
 
 const collegeAbbreviations = {
-  'Alabama Crimson Tide': 'ALA',
-  'Arkansas Razorbacks': 'ARK',
-  'Auburn Tigers': 'AUB',
-  'Clemson Tigers': 'CLEM',
-  'Florida Gators': 'FLA',
-  'Florida State Seminoles': 'FSU',
-  'Georgia Bulldogs': 'UGA',
-  'Iowa Hawkeyes': 'IOWA',
-  'LSU Tigers': 'LSU',
-  'Miami Hurricanes': 'MIA',
-  'Michigan Wolverines': 'MICH',
-  'Mississippi State Bulldogs': 'MSST',
-  'Notre Dame Fighting Irish': 'ND',
-  'Ohio State Buckeyes': 'OSU',
-  'Oklahoma Sooners': 'OU',
-  'Oklahoma State Cowboys': 'OKST',
-  'Ole Miss Rebels': 'MISS',
-  'Oregon Ducks': 'ORE',
-  'Penn State Nittany Lions': 'PSU',
-  'South Carolina Gamecocks': 'SC',
-  'Tennessee Volunteers': 'TENN',
-  'Texas Longhorns': 'TEX',
-  'Texas A&M Aggies': 'TAMU',
-  'Utah Utes': 'UTAH',
-  'Washington Huskies': 'WASH',
-  'Wisconsin Badgers': 'WIS',
+  'Alabama Crimson Tide': 'ALA', 'Arkansas Razorbacks': 'ARK', 'Auburn Tigers': 'AUB',
+  'Clemson Tigers': 'CLEM', 'Florida Gators': 'FLA', 'Florida State Seminoles': 'FSU',
+  'Georgia Bulldogs': 'UGA', 'Iowa Hawkeyes': 'IOWA', 'LSU Tigers': 'LSU',
+  'Miami Hurricanes': 'MIA', 'Michigan Wolverines': 'MICH', 'Mississippi State Bulldogs': 'MSST',
+  'Notre Dame Fighting Irish': 'ND', 'Ohio State Buckeyes': 'OSU', 'Oklahoma Sooners': 'OU',
+  'Oklahoma State Cowboys': 'OKST', 'Ole Miss Rebels': 'MISS', 'Oregon Ducks': 'ORE',
+  'Penn State Nittany Lions': 'PSU', 'South Carolina Gamecocks': 'SC', 'Tennessee Volunteers': 'TENN',
+  'Texas Longhorns': 'TEX', 'Texas A&M Aggies': 'TAMU', 'Utah Utes': 'UTAH',
+  'Washington Huskies': 'WASH', 'Wisconsin Badgers': 'WIS',
 };
 
 const collegeShortNames = {
-  'Oklahoma State Cowboys': 'Oklahoma St.',
-  'Mississippi State Bulldogs': 'Mississippi St.',
-  'Florida State Seminoles': 'Florida St.',
-  'Kansas State Wildcats': 'Kansas St.',
-  'Michigan State Spartans': 'Michigan St.',
-  'Ohio State Buckeyes': 'Ohio State',
-  'Penn State Nittany Lions': 'Penn State',
-  'Arizona State Sun Devils': 'Arizona St.',
-  'Iowa State Cyclones': 'Iowa State',
-  'Boise State Broncos': 'Boise St.',
+  'Oklahoma State Cowboys': 'Oklahoma St.', 'Mississippi State Bulldogs': 'Mississippi St.',
+  'Florida State Seminoles': 'Florida St.', 'Kansas State Wildcats': 'Kansas St.',
+  'Michigan State Spartans': 'Michigan St.', 'Ohio State Buckeyes': 'Ohio State',
+  'Penn State Nittany Lions': 'Penn State', 'Arizona State Sun Devils': 'Arizona St.',
+  'Iowa State Cyclones': 'Iowa State', 'Boise State Broncos': 'Boise St.',
   'Oregon State Beavers': 'Oregon St.',
 };
 
@@ -75,13 +53,14 @@ export function getDisplayTeamName(team) {
 }
 
 export function TeamMark({ team, size = 'medium' }) {
-  const identity = teamIdentity[team?.id] || { color: '#64748b' };
+  const identity = teamIdentity[team?.id];
+  const color = team?.color || team?.primaryColor || team?.teamColor || identity?.color || '#64748b';
   const label = getTeamAbbreviation(team);
 
   return (
     <span
       className={`team-mark ${size}`}
-      style={{ '--team-color': identity.color }}
+      style={{ '--team-color': color }}
       aria-label={`${team?.name || 'Team'} logo mark`}
     >
       <span>{label}</span>
