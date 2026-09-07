@@ -20,9 +20,11 @@ function isNflMajorGame(game) {
   if (game.leagueId !== 'nfl') return false;
   const divisional = game.isDivisional === true;
   const strongRecords = bothTeamsMeet(game, (team) => typeof team.winPercentage === 'number' && team.winPercentage >= 0.667);
-  // Week 1 has no meaningful standings data yet, so surface the opening-week NFL slate.
-  const weekOne = String(game.round || '').toLowerCase().includes('week 1') || String(game.round || '').toLowerCase() === '1';
-  return divisional || strongRecords || hasMeaningfulImplications(game) || weekOne;
+  return divisional || strongRecords || hasMeaningfulImplications(game);
+}
+
+function isNflRegularGame(game) {
+  return game.leagueId === 'nfl' && !isNflMajorGame(game) && !isUniversalMajorGame(game);
 }
 
 function isNbaMajorGame(game) {
@@ -45,12 +47,43 @@ export function getPriorityTier(game) {
   if (gameHasTeam(game, mustSeeTeamIds)) return PRIORITY_TIERS.MUST_SEE;
   if (gameHasTeam(game, favoriteTeamIds)) return PRIORITY_TIERS.FAVORITE_TEAM;
   if (game.eventType === 'championship' || game.eventType === 'final' || game.isMajorEvent === true) return PRIORITY_TIERS.MAJOR_EVENT;
+  if (isNflRegularGame(game)) return PRIORITY_TIERS.NFL_REGULAR;
   if (isMajorGame(game)) return PRIORITY_TIERS.MAJOR_GAME;
   return PRIORITY_TIERS.NORMAL;
 }
+
 export function isMajorGameForPriority(game) { return isMajorGame(game); }
 export function isMajorUclGameForPriority(game) { return isMajorUclGame(game); }
-export function getPriorityLabel(tier) { const labels = { [PRIORITY_TIERS.CHAMPIONS_LEAGUE]: 'Champions League', [PRIORITY_TIERS.MUST_SEE]: 'Must See', [PRIORITY_TIERS.FAVORITE_TEAM]: 'Favorite Team', [PRIORITY_TIERS.MAJOR_EVENT]: 'Major Event', [PRIORITY_TIERS.MAJOR_GAME]: 'Major Game', [PRIORITY_TIERS.NORMAL]: 'Normal' }; return labels[tier] ?? 'Normal'; }
-function getSecondaryPriority(game) { if (gameHasTeam(game, favoriteTeamIds) && game.isRivalry === true) return 0; if (isMajorGame(game) || isMajorUclGame(game)) return 1; return 2; }
+
+export function getPriorityLabel(tier) {
+  const labels = {
+    [PRIORITY_TIERS.CHAMPIONS_LEAGUE]: 'Champions League',
+    [PRIORITY_TIERS.MUST_SEE]: 'Must See',
+    [PRIORITY_TIERS.FAVORITE_TEAM]: 'Favorite Team',
+    [PRIORITY_TIERS.MAJOR_EVENT]: 'Major Event',
+    [PRIORITY_TIERS.NFL_REGULAR]: 'NFL',
+    [PRIORITY_TIERS.MAJOR_GAME]: 'Major Game',
+    [PRIORITY_TIERS.NORMAL]: 'Normal',
+  };
+  return labels[tier] ?? 'Normal';
+}
+
+function getSecondaryPriority(game) {
+  if (gameHasTeam(game, favoriteTeamIds) && game.isRivalry === true) return 0;
+  if (isMajorGame(game) || isMajorUclGame(game)) return 1;
+  return 2;
+}
+
 export function getLeaguePriority(leagueId) { return LEAGUE_PRIORITY[leagueId] ?? Number.MAX_SAFE_INTEGER; }
-export function sortGamesByPriority(games) { return [...games].sort((a, b) => { const tierDifference = getPriorityTier(a) - getPriorityTier(b); if (tierDifference !== 0) return tierDifference; const secondaryDifference = getSecondaryPriority(a) - getSecondaryPriority(b); if (secondaryDifference !== 0) return secondaryDifference; const leagueDifference = getLeaguePriority(a.leagueId) - getLeaguePriority(b.leagueId); if (leagueDifference !== 0) return leagueDifference; return new Date(a.startTime).getTime() - new Date(b.startTime).getTime(); }); }
+
+export function sortGamesByPriority(games) {
+  return [...games].sort((a, b) => {
+    const tierDifference = getPriorityTier(a) - getPriorityTier(b);
+    if (tierDifference !== 0) return tierDifference;
+    const secondaryDifference = getSecondaryPriority(a) - getSecondaryPriority(b);
+    if (secondaryDifference !== 0) return secondaryDifference;
+    const leagueDifference = getLeaguePriority(a.leagueId) - getLeaguePriority(b.leagueId);
+    if (leagueDifference !== 0) return leagueDifference;
+    return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+  });
+}
