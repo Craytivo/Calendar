@@ -7,6 +7,7 @@ const teamIdentity = {
   tottenham: { label: 'TOT', color: '#132257' },
   'blue-jays': { label: 'TOR', color: '#134A8E' },
   oilers: { label: 'EDM', color: '#FF4C00' },
+  vikings: { label: 'MIN', color: '#4F2683' },
 };
 
 const favoriteLogoPaths = {
@@ -16,6 +17,7 @@ const favoriteLogoPaths = {
   tottenham: '/team-logos/tottenham.png',
   'blue-jays': '/team-logos/blue-jays.png',
   oilers: '/team-logos/oilers.png',
+  vikings: '/team-logos/vikings.png',
 };
 
 const collegeAbbreviations = {
@@ -65,8 +67,6 @@ export function TeamMark({ team, size = 'medium' }) {
   const identity = teamIdentity[team?.id];
   const color = team?.color || team?.primaryColor || team?.teamColor || identity?.color || '#64748b';
   const label = getTeamAbbreviation(team);
-  // Provider game objects do not necessarily carry favorite=true. The stable
-  // favorite team ID is therefore the source of truth for local logos.
   const localLogoPath = favoriteLogoPaths[team?.id];
   const [imageFailed, setImageFailed] = useState(false);
 
@@ -83,14 +83,7 @@ export function TeamMark({ team, size = 'medium' }) {
       aria-label={`${team?.name || 'Team'} ${showLogo ? 'logo' : 'abbreviation'}`}
     >
       {showLogo ? (
-        <img
-          src={localLogoPath}
-          alt=""
-          aria-hidden="true"
-          loading="lazy"
-          decoding="async"
-          onError={() => setImageFailed(true)}
-        />
+        <img src={localLogoPath} alt="" aria-hidden="true" loading="lazy" decoding="async" onError={() => setImageFailed(true)} />
       ) : (
         <span>{label}</span>
       )}
