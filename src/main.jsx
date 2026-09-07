@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { leagues } from './sports/leagues.js';
+import { favoriteTeamIds } from './sports/team-identity.js';
 import { getMyGames } from './sports/selectors.js';
 import { AppHeader } from './components/AppHeader.jsx';
 import { CalendarView } from './components/CalendarView.jsx';
@@ -11,8 +12,17 @@ import { ViewSwitcher } from './components/ViewSwitcher.jsx';
 import './styles.css';
 import './styles-polish.css';
 
-const favoriteTeamIds = new Set(['sac-kings', 'oregon-ducks', 'real-madrid', 'tottenham', 'blue-jays', 'dodgers', 'oilers', 'vikings']);
 const viewerTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+function formatFreshness(date, loading) {
+  if (loading && !date) return 'Updating data…';
+  if (!date) return 'Waiting for data';
+  const ageSeconds = Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 1000));
+  if (ageSeconds < 10) return 'Updated just now';
+  if (ageSeconds < 60) return `Updated ${ageSeconds}s ago`;
+  const minutes = Math.floor(ageSeconds / 60);
+  return `Updated ${minutes}m ago`;
+}
 
 function App() {
   const today = new Date();
@@ -27,6 +37,7 @@ function App() {
   const [error, setError] = useState('');
   const [dataHealth, setDataHealth] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [freshnessNow, setFreshnessNow] = useState(() => Date.now());
 
   const loadGames = async () => {
     setLoading(true);
@@ -46,6 +57,10 @@ function App() {
   };
 
   useEffect(() => { loadGames(); }, []);
+  useEffect(() => {
+    const timer = window.setInterval(() => setFreshnessNow(Date.now()), 10000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const filteredGames = useMemo(() => games
     .filter((game) => activeLeagues.includes(game.leagueId))
@@ -58,6 +73,7 @@ function App() {
   const shiftWeek = (delta) => setCursor((current) => new Date(current.getFullYear(), current.getMonth(), current.getDate() + (delta * 7)));
 
   const nflUnavailable = dataHealth?.nfl?.status === 'error';
+  const freshnessLabel = useMemo(() => formatFreshness(lastUpdated, loading), [lastUpdated, loading, freshnessNow]);
 
   return (
     <main className="app-shell">
@@ -89,7 +105,7 @@ function App() {
 
       <footer>
         <span>{loading ? 'Loading sports data…' : `${filteredMyGames.length} games in your 7-day view`}</span>
-        <span>{lastUpdated ? `Updated ${new Date(lastUpdated).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Free data aggregation'}</span>
+        <span className="data-freshness" title="Based on the last successful sports API response">{freshnessLabel}</span>
       </footer>
 
       <FilterSheet
