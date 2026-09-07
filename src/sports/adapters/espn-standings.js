@@ -1,3 +1,5 @@
+import { normalizeGames } from './normalizer.js';
+
 const ESPN_STANDINGS = {
   nfl: { sport: 'football', league: 'nfl', seasonType: '2' },
   nba: { sport: 'basketball', league: 'nba', seasonType: '2' },
@@ -39,7 +41,6 @@ function stat(entry, names) {
   }
   return undefined;
 }
-
 function normalizeEntry(entry, group) {
   const team = entry.team ?? {};
   const name = team.displayName ?? team.shortDisplayName ?? team.name ?? '';
@@ -53,50 +54,16 @@ function normalizeEntry(entry, group) {
   const playoffSeed = number(stat(entry, ['playoffSeed', 'seed']));
   const gamesBehind = number(stat(entry, ['gamesBehind', 'gb']));
   const playoffStatus = clean(entry.note ?? entry.status?.name ?? entry.status?.type);
-
-  return {
-    id: FAVORITE_TEAM_NAMES[clean(name)] ?? `espn:${team.id ?? clean(name)}`,
-    providerId: team.id,
-    name,
-    abbreviation: team.abbreviation,
-    wins, losses, ties, gamesPlayed, winPercentage,
-    ranking: number(stat(entry, ['apRank', 'rank', 'pollRank', 'currentRank'])) ?? number(entry.rank),
-    leagueRank: rank,
-    conferenceRank: conferenceRank ?? playoffSeed,
-    playoffSeed, gamesBehind,
-    conference: group?.abbreviation ?? group?.name,
-    division: clean(name) in NFL_DIVISIONS ? NFL_DIVISIONS[clean(name)] : group?.name,
-    playoffStatus,
-  };
+  return { id: FAVORITE_TEAM_NAMES[clean(name)] ?? `espn:${team.id ?? clean(name)}`, providerId: team.id, name, abbreviation: team.abbreviation, wins, losses, ties, gamesPlayed, winPercentage, ranking: number(stat(entry, ['apRank', 'rank', 'pollRank', 'currentRank'])) ?? number(entry.rank), leagueRank: rank, conferenceRank: conferenceRank ?? playoffSeed, playoffSeed, gamesBehind, conference: group?.abbreviation ?? group?.name, division: clean(name) in NFL_DIVISIONS ? NFL_DIVISIONS[clean(name)] : group?.name, playoffStatus };
 }
-
-function getEntries(payload) {
-  return (payload?.groups ?? []).flatMap((group) => (group.entries ?? []).map((entry) => normalizeEntry(entry, group)));
-}
-
+function getEntries(payload) { return (payload?.groups ?? []).flatMap((group) => (group.entries ?? []).map((entry) => normalizeEntry(entry, group))); }
 function isLateSeason(game) {
   const date = new Date(game.startTime);
   if (Number.isNaN(date.getTime())) return false;
-  return (game.leagueId === 'nfl' && date.getMonth() >= 11) ||
-    (game.leagueId === 'nba' && (date.getMonth() <= 3 || date.getMonth() >= 10)) ||
-    (game.leagueId === 'mlb' && date.getMonth() >= 8) ||
-    (game.leagueId === 'nhl' && date.getMonth() >= 3);
+  return (game.leagueId === 'nfl' && date.getMonth() >= 11) || (game.leagueId === 'nba' && (date.getMonth() <= 3 || date.getMonth() >= 10)) || (game.leagueId === 'mlb' && date.getMonth() >= 8) || (game.leagueId === 'nhl' && date.getMonth() >= 3);
 }
-
-function maturityFor(leagueId) {
-  if (leagueId === 'nfl') return 8;
-  if (leagueId === 'nba') return 50;
-  if (leagueId === 'mlb') return 100;
-  if (leagueId === 'nhl') return 50;
-  return 0;
-}
-function cutoffFor(leagueId) {
-  if (leagueId === 'nfl') return 7;
-  if (leagueId === 'nba') return 8;
-  if (leagueId === 'nhl') return 8;
-  if (leagueId === 'mlb') return 12;
-  return undefined;
-}
+function maturityFor(leagueId) { if (leagueId === 'nfl') return 8; if (leagueId === 'nba') return 50; if (leagueId === 'mlb') return 100; if (leagueId === 'nhl') return 50; return 0; }
+function cutoffFor(leagueId) { if (leagueId === 'nfl') return 7; if (leagueId === 'nba') return 8; if (leagueId === 'nhl') return 8; if (leagueId === 'mlb') return 12; return undefined; }
 function significantPlayoffRace(game) {
   if (!['nfl', 'nba', 'mlb', 'nhl'].includes(game.leagueId)) return false;
   const home = game.homeTeam, away = game.awayTeam, cutoff = cutoffFor(game.leagueId), maturity = maturityFor(game.leagueId);
@@ -118,49 +85,36 @@ function enrichGame(game, standingsByName) {
   if (['nfl', 'nba', 'mlb', 'nhl'].includes(game.leagueId)) enriched.hasPlayoffImplications = Boolean(game.hasPlayoffImplications || significantPlayoffRace(enriched));
   return enriched;
 }
-
 function fallbackUrlFor(url) { return url.replace(ESPN_BASE, ESPN_FALLBACK_BASE); }
 function shouldTryFallback(error) { return error?.status === 403 || error?.name === 'TypeError' || /Network connection lost|fetch failed/i.test(error?.message || ''); }
-
 async function requestJson(url) {
   const started = Date.now();
   const response = await fetch(url, { headers: ESPN_HEADERS });
   const durationMs = Date.now() - started;
-  if (!response.ok) {
-    const error = new Error(`ESPN standings returned ${response.status}`);
-    error.status = response.status;
-    error.durationMs = durationMs;
-    throw error;
-  }
+  if (!response.ok) { const error = new Error(`ESPN standings returned ${response.status}`); error.status = response.status; error.durationMs = durationMs; throw error; }
   return { data: await response.json(), durationMs };
 }
-
 async function fetchJson(url) {
-  try {
-    return { ...(await requestJson(url)), provider: 'ESPN primary' };
-  } catch (primaryError) {
+  try { return { ...(await requestJson(url)), provider: 'ESPN primary' }; }
+  catch (primaryError) {
     if (!shouldTryFallback(primaryError)) throw primaryError;
     await new Promise((resolve) => setTimeout(resolve, 150));
-    try {
-      return { ...(await requestJson(fallbackUrlFor(url))), provider: 'ESPN fallback' };
-    } catch (fallbackError) {
-      const error = new Error(`${primaryError.message}; fallback ${fallbackError.message}`);
-      error.status = fallbackError.status || primaryError.status;
-      error.durationMs = (primaryError.durationMs || 0) + (fallbackError.durationMs || 0);
-      throw error;
-    }
+    try { return { ...(await requestJson(fallbackUrlFor(url))), provider: 'ESPN fallback' }; }
+    catch (fallbackError) { const error = new Error(`${primaryError.message}; fallback ${fallbackError.message}`); error.status = fallbackError.status || primaryError.status; error.durationMs = (primaryError.durationMs || 0) + (fallbackError.durationMs || 0); throw error; }
   }
 }
-
-export async function fetchEspnStandings(leagueId, year = new Date().getFullYear()) {
+function standingsUrl(leagueId, year) {
   const config = ESPN_STANDINGS[leagueId];
-  if (!config) return [];
   const url = new URL(`${ESPN_BASE}/${config.sport}/${config.league}/standings`);
   url.searchParams.set('season', String(year));
   url.searchParams.set('seasontype', config.seasonType);
-  return (await fetchJson(url.toString())).data ? getEntries((await fetchJson(url.toString())).data) : [];
+  return url.toString();
 }
-
+export async function fetchEspnStandings(leagueId, year = new Date().getFullYear()) {
+  if (!ESPN_STANDINGS[leagueId]) return [];
+  const fetched = await fetchJson(standingsUrl(leagueId, year));
+  return getEntries(fetched.data);
+}
 export async function enrichGamesWithEspnStandings(games, year = new Date().getFullYear()) {
   const leagueIds = [...new Set(games.map((game) => game.leagueId))].filter((leagueId) => ESPN_STANDINGS[leagueId]);
   const results = await Promise.allSettled(leagueIds.map(async (leagueId) => {
@@ -168,16 +122,11 @@ export async function enrichGamesWithEspnStandings(games, year = new Date().getF
     const hit = standingsCache.get(key);
     if (hit && hit.expiresAt > Date.now()) return [leagueId, hit.entries, { cached: true, durationMs: 0, provider: hit.provider }];
     const started = Date.now();
-    const config = ESPN_STANDINGS[leagueId];
-    const url = new URL(`${ESPN_BASE}/${config.sport}/${config.league}/standings`);
-    url.searchParams.set('season', String(year));
-    url.searchParams.set('seasontype', config.seasonType);
-    const fetched = await fetchJson(url.toString());
+    const fetched = await fetchJson(standingsUrl(leagueId, year));
     const entries = getEntries(fetched.data);
     standingsCache.set(key, { entries, provider: fetched.provider, expiresAt: Date.now() + STANDINGS_CACHE_SECONDS * 1000 });
     return [leagueId, entries, { cached: false, durationMs: Date.now() - started || fetched.durationMs, provider: fetched.provider }];
   }));
-
   const byLeague = new Map();
   const diagnostics = [];
   for (const result of results) {
@@ -186,9 +135,6 @@ export async function enrichGamesWithEspnStandings(games, year = new Date().getF
     byLeague.set(leagueId, new Map(entries.map((entry) => [clean(entry.name), entry])));
     diagnostics.push({ leagueId, provider: timing.provider, cached: timing.cached, durationMs: timing.durationMs, count: entries.length });
   }
-
-  const enriched = games.map((game) => enrichGame(game, byLeague.get(game.leagueId) ?? new Map()));
-  return { games: enriched, diagnostics };
+  return { games: normalizeGames(games.map((game) => enrichGame(game, byLeague.get(game.leagueId) ?? new Map()))), diagnostics };
 }
-
 export { ESPN_STANDINGS };
