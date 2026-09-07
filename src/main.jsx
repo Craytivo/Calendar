@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { createRoot } from 'react-dom/client';
 import { leagues } from './sports/leagues.js';
 import { favoriteTeamIds } from './sports/team-identity.js';
 import { getMyGames } from './sports/selectors.js';
@@ -13,6 +12,7 @@ import './styles.css';
 import './styles-polish.css';
 
 const viewerTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+const LIVE_REFRESH_MS = 20_000;
 
 function formatFreshness(date, loading) {
   if (loading && !date) return 'Updating data…';
@@ -39,26 +39,32 @@ function App() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [freshnessNow, setFreshnessNow] = useState(() => Date.now());
 
-  const loadGames = async () => {
-    setLoading(true);
+  const loadGames = async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     setError('');
     try {
-      const response = await fetch(`/api/sports?days=7&timezone=${encodeURIComponent(viewerTimeZone)}`);
+      const response = await fetch(`/api/sports?days=7&timezone=${encodeURIComponent(viewerTimeZone)}`, { cache: 'no-store' });
       if (!response.ok) throw new Error('Sports data unavailable');
       const payload = await response.json();
-      setGames(payload.games ?? []);
+      const nextGames = payload.games ?? [];
+      setGames(nextGames);
       setDataHealth(payload.health ?? null);
       setLastUpdated(payload.fetchedAt ?? new Date().toISOString());
+      setSelectedGame((current) => current ? nextGames.find((game) => game.id === current.id) ?? current : current);
     } catch (err) {
-      setError(err.message || 'Unable to load sports data');
+      if (!silent || !games.length) setError(err.message || 'Unable to load sports data');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => { loadGames(); }, []);
+
   useEffect(() => {
-    const timer = window.setInterval(() => setFreshnessNow(Date.now()), 10000);
+    const timer = window.setInterval(() => {
+      setFreshnessNow(Date.now());
+      void loadGames({ silent: true });
+    }, LIVE_REFRESH_MS);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -105,7 +111,7 @@ function App() {
 
       <footer>
         <span>{loading ? 'Loading sports data…' : `${filteredMyGames.length} games in your 7-day view`}</span>
-        <span className="data-freshness" title="Based on the last successful sports API response">{freshnessLabel}</span>
+        <span className="data-freshness" title="Live games refresh automatically every 20 seconds">{freshnessLabel}</span>
       </footer>
 
       <FilterSheet
