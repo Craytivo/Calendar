@@ -127,12 +127,7 @@ function enrichGame(game, standingsByName) {
   const enriched = { ...game, homeTeam, awayTeam, isDivisional: game.leagueId === 'nfl' ? isDivisional : game.isDivisional };
 
   if (['nfl', 'nba', 'mlb', 'nhl'].includes(game.leagueId)) {
-    enriched.hasPlayoffImplications = Boolean(
-      game.hasPlayoffImplications ||
-      homeTeam?.playoffStatus?.includes('clinched') ||
-      awayTeam?.playoffStatus?.includes('clinched') ||
-      significantPlayoffRace(enriched),
-    );
+    enriched.hasPlayoffImplications = Boolean(game.hasPlayoffImplications || significantPlayoffRace(enriched));
   }
   return enriched;
 }
