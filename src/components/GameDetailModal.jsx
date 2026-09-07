@@ -1,19 +1,9 @@
-import React, { useEffect } from 'react';
-import { CalendarDays, Clock3, MapPin, X } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { CalendarDays, MapPin, Radio, Trophy, Tv, X } from 'lucide-react';
 import { leagues } from '../sports/leagues.js';
 import { getPriorityLabel, getPriorityTier } from '../sports/priority.js';
 import { TeamMark, getDisplayTeamName } from './TeamMark.jsx';
 import './GameDetailModal.css';
-
-function formatDateTime(startTime) {
-  return new Date(startTime).toLocaleString([], {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
 
 function scoreFor(game, side) {
   const topLevel = side === 'away' ? game.awayScore : game.homeScore;
@@ -35,12 +25,60 @@ function detailValue(value) {
   return String(value).replace(/[-_]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function formatDate(startTime) {
+  return new Date(startTime).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+}
+
+function formatTime(startTime) {
+  return new Date(startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function formatCountdown(milliseconds) {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m ${seconds}s`;
+}
+
+function getImportanceText(game, tier) {
+  if (game.leagueId === 'ucl') {
+    if (game.isElimination || game.isTwoLegTie || game.uclStage) return detailValue(game.uclStage || game.round) || 'Champions League matchup';
+    return 'Champions League';
+  }
+  if (game.isDivisional) return 'Divisional matchup';
+  if (game.homeTeam?.ranking && game.awayTeam?.ranking) return 'Top-25 matchup';
+  if (game.hasPlayoffImplications || game.hasSeedingImplications) return 'Playoff implications';
+  if (game.hasTitleOrUclQualificationImplications) return 'Title / qualification implications';
+  if (game.isElimination) return 'Elimination game';
+  if (game.eventType === 'championship' || game.eventType === 'final') return 'Championship';
+  if (game.eventType === 'main-card') return 'Main card';
+  if (tier <= 2) return 'Favorite team matchup';
+  return null;
+}
+
+function TeamPanel({ team, score, winner, live }) {
+  return (
+    <div className={`game-detail-team-panel ${winner ? 'winner' : ''}`}>
+      <TeamMark team={team} size="large" />
+      <div className="game-detail-team-name">{getDisplayTeamName(team)}</div>
+      {team?.abbreviation && <div className="game-detail-team-abbr">{team.abbreviation}</div>}
+      {score != null && <div className="game-detail-score">{score}</div>}
+      {live && <span className="game-detail-team-state">{winner ? 'LEADING' : 'IN PLAY'}</span>}
+      {!live && winner && <span className="game-detail-team-state">WINNER</span>}
+    </div>
+  );
+}
+
 export function GameDetailModal({ game, onClose }) {
+  const [now, setNow] = useState(() => Date.now());
+
   useEffect(() => {
     if (!game) return undefined;
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') onClose();
-    };
+    const onKeyDown = (event) => { if (event.key === 'Escape') onClose(); };
     document.addEventListener('keydown', onKeyDown);
     document.body.style.overflow = 'hidden';
     return () => {
@@ -49,6 +87,13 @@ export function GameDetailModal({ game, onClose }) {
     };
   }, [game, onClose]);
 
+  useEffect(() => {
+    if (!game || game.status !== 'scheduled') return undefined;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [game]);
+
+  const countdown = useMemo(() => game ? new Date(game.startTime).getTime() - now : 0, [game, now]);
   if (!game) return null;
 
   const league = leagues.find((item) => item.id === game.leagueId);
@@ -56,57 +101,75 @@ export function GameDetailModal({ game, onClose }) {
   const awayScore = scoreFor(game, 'away');
   const homeScore = scoreFor(game, 'home');
   const isLive = game.status === 'live';
+  const isFinal = game.status === 'final';
   const away = game.awayTeam || { name: 'TBD' };
   const home = game.homeTeam || { name: 'TBD' };
+  const awayWinner = isFinal && awayScore != null && homeScore != null && awayScore > homeScore;
+  const homeWinner = isFinal && awayScore != null && homeScore != null && homeScore > awayScore;
+  const importance = getImportanceText(game, tier);
+  const favoriteTeam = Boolean(away.favorite || home.favorite);
+  const liveLabel = isLive ? 'Game in progress' : isFinal ? 'Game complete' : countdown > 0 ? `Starts in ${formatCountdown(countdown)}` : 'Starting now';
 
-  const details = [
-    { label: 'Date & time', value: formatDateTime(game.startTime), icon: CalendarDays },
+  const meta = [
+    { label: 'Date', value: formatDate(game.startTime), icon: CalendarDays },
+    { label: 'Time', value: formatTime(game.startTime), icon: null },
     game.venue ? { label: 'Venue', value: game.venue, icon: MapPin } : null,
-    game.round ? { label: 'Round', value: detailValue(game.round), icon: null } : null,
+    game.round ? { label: 'Round', value: detailValue(game.round), icon: Trophy } : null,
     game.competitionPhase ? { label: 'Phase', value: detailValue(game.competitionPhase), icon: null } : null,
+    game.network ? { label: 'Watch', value: game.network, icon: Tv } : null,
   ].filter(Boolean);
 
   return (
     <div className="game-detail-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div className={`game-detail-modal ${isLive ? 'is-live' : ''}`} role="dialog" aria-modal="true" aria-labelledby="game-detail-title">
-        <header className="game-detail-header">
-          <div>
-            <span className="game-detail-eyebrow">{league?.shortName || game.leagueId.toUpperCase()}</span>
-            <h2 id="game-detail-title">Game Details</h2>
-          </div>
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Close game details"><X size={18} /></button>
-        </header>
+      <div className={`game-detail-modal ${isLive ? 'is-live' : ''} ${isFinal ? 'is-final' : ''}`} role="dialog" aria-modal="true" aria-labelledby="game-detail-title">
+        <div className="game-detail-hero">
+          <header className="game-detail-header">
+            <div className="game-detail-league">
+              <span className="game-detail-eyebrow">{league?.shortName || game.leagueId.toUpperCase()}</span>
+              <strong>{league?.name || game.leagueId}</strong>
+            </div>
+            <button type="button" className="icon-button game-detail-close" onClick={onClose} aria-label="Close game details"><X size={18} /></button>
+          </header>
 
-        <div className="game-detail-body">
           <div className="game-detail-status-row">
             <span className={`game-detail-status ${isLive ? 'live' : ''}`}>
-              {isLive && <span className="game-detail-live-dot" />}
+              {isLive ? <span className="game-detail-live-dot" /> : <span className="game-detail-status-mark" />}
               {statusLabel(game)}
             </span>
-            {tier < 6 && <span className="game-detail-priority">{getPriorityLabel(tier)}</span>}
+            <div className="game-detail-badges">
+              {favoriteTeam && <span className="game-detail-favorite">Favorite team</span>}
+              {tier < 6 && <span className="game-detail-priority">{getPriorityLabel(tier)}</span>}
+            </div>
           </div>
 
           <div className="game-detail-matchup">
-            <div className="game-detail-team">
-              <TeamMark team={away} size="large" />
-              <strong>{getDisplayTeamName(away)}</strong>
-              {awayScore != null && <span className="game-detail-score">{awayScore}</span>}
+            <TeamPanel team={away} score={awayScore} winner={awayWinner} live={isLive} />
+            <div className="game-detail-center">
+              {isLive || isFinal ? <div className="game-detail-score-state">{isLive ? 'LIVE' : 'FINAL'}</div> : <div className="game-detail-countdown">{liveLabel}</div>}
+              <div className="game-detail-vs">{isLive || isFinal ? '—' : 'VS'}</div>
             </div>
-            <div className="game-detail-vs">{isLive || game.status === 'final' ? '—' : 'VS'}</div>
-            <div className="game-detail-team">
-              <TeamMark team={home} size="large" />
-              <strong>{getDisplayTeamName(home)}</strong>
-              {homeScore != null && <span className="game-detail-score">{homeScore}</span>}
-            </div>
+            <TeamPanel team={home} score={homeScore} winner={homeWinner} live={isLive} />
           </div>
 
+          {importance && (
+            <div className="game-detail-storyline">
+              <Trophy size={16} />
+              <div><span>Why it matters</span><strong>{importance}</strong></div>
+            </div>
+          )}
+        </div>
+
+        <div className="game-detail-content">
           <div className="game-detail-info">
-            {details.map(({ label, value, icon: Icon }) => (
+            {meta.map(({ label, value, icon: Icon }) => (
               <div className="game-detail-info-row" key={label}>
                 <span className="game-detail-info-label">{Icon ? <Icon size={15} /> : <span className="detail-dot" />}{label}</span>
                 <strong>{value}</strong>
               </div>
             ))}
+          </div>
+          <div className="game-detail-live-note">
+            {isLive ? <><Radio size={14} /> Live score</> : isFinal ? 'Final score' : liveLabel}
           </div>
         </div>
       </div>
