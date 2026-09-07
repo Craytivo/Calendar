@@ -37,13 +37,7 @@ function isNbaMajorGame(game) {
 function isNcaaFootballMajorGame(game) { if (game.leagueId !== 'ncaa-football') return false; return bothTeamsMeet(game, (team) => typeof team.ranking === 'number' && team.ranking >= 1 && team.ranking <= 25) || hasMeaningfulImplications(game); }
 function isEplMajorGame(game) { if (game.leagueId !== 'epl') return false; return bothTeamsMeet(game, (team) => typeof team.leagueRank === 'number' && team.leagueRank <= 5) || game.hasTitleOrUclQualificationImplications === true; }
 function isLaLigaMajorGame(game) { if (game.leagueId !== 'laliga') return false; return bothTeamsMeet(game, (team) => typeof team.leagueRank === 'number' && team.leagueRank <= 3) || game.hasTitleOrUclQualificationImplications === true; }
-
-// Regular-season MLB games are intentionally lower signal unless they involve
-// one of the user's favorite teams. MLB postseason games still receive the
-// universal major-game treatment below.
-function isMlbPlayoffGame(game) {
-  return game.leagueId === 'mlb' && isPlayoffOrPostseason(game);
-}
+function isMlbPlayoffGame(game) { return game.leagueId === 'mlb' && isPlayoffOrPostseason(game); }
 function isLeagueSpecificMajorGame(game) { return isNflMajorGame(game) || isNbaMajorGame(game) || isNcaaFootballMajorGame(game) || isEplMajorGame(game) || isLaLigaMajorGame(game); }
 function isMajorGame(game) { return isUniversalMajorGame(game) || isLeagueSpecificMajorGame(game) || isMlbPlayoffGame(game); }
 function isMajorUclGame(game) { if (game.leagueId !== 'ucl') return false; return gameHasTeam(game, realMadridTeamIds) || isKnockoutGame(game) || isChampionship(game) || isEliminationGame(game) || game.isMajorEvent === true || hasMeaningfulImplications(game); }
@@ -54,7 +48,7 @@ export function getPriorityTier(game) {
   if (gameHasTeam(game, mustSeeTeamIds)) return PRIORITY_TIERS.MUST_SEE;
   if (gameHasTeam(game, favoriteTeamIds)) return PRIORITY_TIERS.FAVORITE_TEAM;
   if (game.eventType === 'championship' || game.eventType === 'final' || game.isMajorEvent === true) return PRIORITY_TIERS.MAJOR_EVENT;
-  if (isNflRegularGame(game)) return PRIORITY_TIERS.NFL_REGULAR;
+  if (isNflRegularGame(game)) return PRIORITY_TIERS.NORMAL;
   if (isMajorGame(game)) return PRIORITY_TIERS.MAJOR_GAME;
   return PRIORITY_TIERS.NORMAL;
 }
