@@ -6,7 +6,7 @@ import { applyDomesticSoccerRaceContext } from '../src/sports/adapters/soccer-co
 const API_BASE = 'https://www.thesportsdb.com/api/v1/json/123';
 const WINDOW_DAYS = 7;
 const SCHEDULE_CACHE_SECONDS = 60;
-const LIVE_CACHE_SECONDS = 20;
+const LIVE_CACHE_SECONDS = 30;
 const STANDINGS_CACHE_SECONDS = 600;
 const CIRCUIT_FAILURE_THRESHOLD = 3;
 const CIRCUIT_COOLDOWN_MS = 30_000;
