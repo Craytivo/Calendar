@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createRoot } from 'react-dom/client';
 import { leagues } from './sports/leagues.js';
 import { favoriteTeamIds } from './sports/team-identity.js';
 import { getMyGames } from './sports/selectors.js';
