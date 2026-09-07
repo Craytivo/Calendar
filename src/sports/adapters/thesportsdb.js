@@ -1,5 +1,5 @@
 import { normalizeGames } from './normalizer.js';
-import { applyUclTieContext, isUclKnockoutStage, normalizeUclStage } from './soccer-context.js';
+import { applyUclTieContext, inferUclLeg, isUclKnockoutStage, normalizeUclStage } from './soccer-context.js';
 
 export const THESPORTSDB_LEAGUES = [
   { id: 'nfl', providerId: '4391', name: 'NFL' },
@@ -51,6 +51,7 @@ function toProviderGame(raw, league) {
   const uclStage = league.id === 'ucl' ? normalizeUclStage(raw, startTime) : undefined;
   const eventType = inferEventType(raw, league.id, uclStage);
   const knockout = league.id === 'ucl' && isUclKnockoutStage(uclStage);
+  const leg = league.id === 'ucl' && knockout ? inferUclLeg(raw) : undefined;
 
   return {
     id: `tsdb:${raw.idEvent}`,
@@ -66,6 +67,7 @@ function toProviderGame(raw, league) {
     competitionPhase: uclStage === 'league-phase' ? 'league-phase' : uclStage === 'qualifying' ? 'qualifying' : knockout ? 'knockout' : undefined,
     uclStage,
     isTwoLegTie: knockout,
+    ...(leg !== undefined ? { leg, isFirstLeg: leg === 1, isSecondLeg: leg === 2 } : {}),
     isElimination: knockout,
     isMajorEvent: eventType === 'championship' || eventType === 'final',
     homeTeam: { id: teamId(homeName, raw.idHomeTeam, league.id), name: homeName, leagueId: league.id },
