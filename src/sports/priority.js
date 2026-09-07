@@ -45,22 +45,12 @@ export function getPriorityScore(game) {
   if (isEliminationGame(game)) score += 20;
   if (isKnockoutGame(game)) score += 20;
   if (game.isMajorEvent === true) score += 15;
-  if (hasMeaningfulImplications(game)) score += 10;
   if (game.hasTitleOrUclQualificationImplications === true) score += 15;
   if (game.isDivisional === true) score += 10;
   if (game.isRivalry === true && gameHasTeam(game, favoriteTeamIds)) score += 25;
-  if (game.leagueId === 'ncaa-football') {
-    const rankings = [game.homeTeam?.ranking, game.awayTeam?.ranking].filter((value) => Number.isFinite(value));
-    if (rankings.length === 2) score += Math.max(0, 26 - Math.max(...rankings));
-  }
-  if (game.leagueId === 'nba') {
-    const records = [game.homeTeam?.winPercentage, game.awayTeam?.winPercentage].filter((value) => Number.isFinite(value));
-    if (records.length === 2) score += Math.round(Math.min(...records) * 10);
-  }
-  if (game.leagueId === 'nfl') {
-    const records = [game.homeTeam?.winPercentage, game.awayTeam?.winPercentage].filter((value) => Number.isFinite(value));
-    if (records.length === 2) score += Math.round(Math.min(...records) * 20);
-  }
+  if (game.leagueId === 'ncaa-football') { const rankings = [game.homeTeam?.ranking, game.awayTeam?.ranking].filter((value) => Number.isFinite(value)); if (rankings.length === 2) score += Math.max(0, 26 - Math.max(...rankings)); }
+  if (game.leagueId === 'nba') { const records = [game.homeTeam?.winPercentage, game.awayTeam?.winPercentage].filter((value) => Number.isFinite(value)); if (records.length === 2) score += Math.round(Math.min(...records) * 10); }
+  if (game.leagueId === 'nfl') { const records = [game.homeTeam?.winPercentage, game.awayTeam?.winPercentage].filter((value) => Number.isFinite(value)); if (records.length === 2) score += Math.round(Math.min(...records) * 20); }
   if (gameHasTeam(game, mustSeeTeamIds)) score += 60;
   else if (gameHasTeam(game, favoriteTeamIds)) score += 40;
   return Math.min(score, 100);
@@ -70,12 +60,10 @@ export function getPriorityReasons(game) {
   const reasons = [];
   if (isMajorUclGame(game)) { if (gameHasTeam(game, realMadridTeamIds)) reasons.push('Real Madrid'); if (isKnockoutGame(game)) reasons.push('UCL knockout'); else if (isEliminationGame(game)) reasons.push('Elimination'); }
   if (game.leagueId === 'ufc' && game.eventType === 'main-card') reasons.push('UFC main card');
-  if (gameHasTeam(game, mustSeeTeamIds)) reasons.push('Must-see team');
-  else if (gameHasTeam(game, favoriteTeamIds)) reasons.push('Favorite team');
+  if (gameHasTeam(game, mustSeeTeamIds)) reasons.push('Must-see team'); else if (gameHasTeam(game, favoriteTeamIds)) reasons.push('Favorite team');
   if (game.isDivisional) reasons.push('Divisional matchup');
   if (game.leagueId === 'ncaa-football' && Number.isFinite(game.homeTeam?.ranking) && Number.isFinite(game.awayTeam?.ranking)) reasons.push(`Top-25: #${game.homeTeam.ranking} vs #${game.awayTeam.ranking}`);
-  if (game.hasTitleOrUclQualificationImplications) reasons.push('Title / qualification race');
-  else if (game.hasPlayoffImplications || game.hasSeedingImplications) reasons.push('Playoff implications');
+  if (game.hasTitleOrUclQualificationImplications) reasons.push('Title / qualification race'); else if (game.hasPlayoffImplications || game.hasSeedingImplications) reasons.push('Playoff implications');
   if (isChampionship(game)) reasons.push('Championship'); else if (isPlayoffOrPostseason(game)) reasons.push('Postseason');
   if (isEliminationGame(game) && !reasons.includes('Elimination')) reasons.push('Elimination');
   return [...new Set(reasons)].slice(0, 3);
@@ -84,12 +72,4 @@ export function getPriorityReasons(game) {
 export function getPriorityLabel(tier) { const labels = { [PRIORITY_TIERS.CHAMPIONS_LEAGUE]: 'Champions League', [PRIORITY_TIERS.MUST_SEE]: 'Must See', [PRIORITY_TIERS.FAVORITE_TEAM]: 'Favorite Team', [PRIORITY_TIERS.MAJOR_EVENT]: 'Major Event', [PRIORITY_TIERS.NFL_REGULAR]: 'NFL', [PRIORITY_TIERS.MAJOR_GAME]: 'Major Game', [PRIORITY_TIERS.NORMAL]: 'Normal' }; return labels[tier] ?? 'Normal'; }
 function getSecondaryPriority(game) { if (gameHasTeam(game, favoriteTeamIds) && game.isRivalry === true) return 0; if (isMajorGame(game) || isMajorUclGame(game)) return 1; return 2; }
 export function getLeaguePriority(leagueId) { return LEAGUE_PRIORITY[leagueId] ?? Number.MAX_SAFE_INTEGER; }
-export function sortGamesByPriority(games) {
-  return [...games].sort((a, b) => {
-    const tierDifference = getPriorityTier(a) - getPriorityTier(b); if (tierDifference !== 0) return tierDifference;
-    const scoreDifference = getPriorityScore(b) - getPriorityScore(a); if (scoreDifference !== 0) return scoreDifference;
-    const secondaryDifference = getSecondaryPriority(a) - getSecondaryPriority(b); if (secondaryDifference !== 0) return secondaryDifference;
-    const leagueDifference = getLeaguePriority(a.leagueId) - getLeaguePriority(b.leagueId); if (leagueDifference !== 0) return leagueDifference;
-    return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
-  });
-}
+export function sortGamesByPriority(games) { return [...games].sort((a, b) => { const tierDifference = getPriorityTier(a) - getPriorityTier(b); if (tierDifference !== 0) return tierDifference; const scoreDifference = getPriorityScore(b) - getPriorityScore(a); if (scoreDifference !== 0) return scoreDifference; const secondaryDifference = getSecondaryPriority(a) - getSecondaryPriority(b); if (secondaryDifference !== 0) return secondaryDifference; const leagueDifference = getLeaguePriority(a.leagueId) - getLeaguePriority(b.leagueId); if (leagueDifference !== 0) return leagueDifference; return new Date(a.startTime).getTime() - new Date(b.startTime).getTime(); }); }
