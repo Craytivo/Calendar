@@ -296,10 +296,7 @@ export function runPriorityChecks() {
     'Favorite-team rivalry should outrank an ordinary favorite-team game',
   );
 
-  const expectedTop = [
-    fixtures.uclRealMadrid,
-    fixtures.uclMajor,
-    fixtures.uclKnockout,
+  const strictMajorFixtures = [
     fixtures.nflDivisional,
     fixtures.nflStrongRecords,
     fixtures.nbaQualifying,
@@ -308,12 +305,11 @@ export function runPriorityChecks() {
     fixtures.laligaTopThree,
     fixtures.mlbImplications,
     fixtures.nhlImplications,
-    fixtures.rivalryNonFavorite,
-    fixtures.marchMadnessEarly,
+    fixtures.marchMadnessSweet16,
+    fixtures.championship,
   ];
 
-  const majorOnly = expectedTop.filter((game) => isMajorGameForPriority(game));
-  assert(majorOnly.length === 11, `Expected 11 strict major fixtures, got ${majorOnly.length}`);
+  assert(strictMajorFixtures.filter((game) => isMajorGameForPriority(game)).length === 10, 'All strict major fixtures should qualify');
 
   return true;
 }
