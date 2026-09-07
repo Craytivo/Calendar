@@ -20,8 +20,6 @@ const LEAGUE_CONFIG = {
   ucl: { sport: 'soccer', league: 'uefa.champions' },
 };
 
-// Stable ESPN IDs are used only as a fallback when a league scoreboard
-// misses a favorite. The app's own stable IDs remain the canonical IDs.
 const FAVORITE_TEAMS = {
   'sac-kings': { name: 'Sacramento Kings', sport: 'basketball', league: 'nba', externalId: '23' },
   'oregon-ducks': { name: 'Oregon Ducks', sport: 'football', league: 'college-football', externalId: '2483' },
@@ -34,60 +32,24 @@ const FAVORITE_TEAMS = {
 };
 
 const FAVORITE_TEAM_IDS = {
-  'Sacramento Kings': 'sac-kings',
-  'Oregon Ducks': 'oregon-ducks',
-  Oregon: 'oregon-ducks',
-  'Real Madrid': 'real-madrid',
-  Tottenham: 'tottenham',
-  'Tottenham Hotspur': 'tottenham',
-  'Toronto Blue Jays': 'blue-jays',
-  'Los Angeles Dodgers': 'dodgers',
-  Dodgers: 'dodgers',
-  'Edmonton Oilers': 'oilers',
-  'Minnesota Vikings': 'vikings',
+  'Sacramento Kings': 'sac-kings', 'Oregon Ducks': 'oregon-ducks', Oregon: 'oregon-ducks', 'Real Madrid': 'real-madrid',
+  Tottenham: 'tottenham', 'Tottenham Hotspur': 'tottenham', 'Toronto Blue Jays': 'blue-jays', 'Los Angeles Dodgers': 'dodgers', Dodgers: 'dodgers',
+  'Edmonton Oilers': 'oilers', 'Minnesota Vikings': 'vikings',
 };
 
-function addDays(date, days) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
-}
-
-function dateKey(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}${month}${day}`;
-}
-
-function cleanName(name = '') {
-  return String(name).replace(/\s+/g, ' ').trim();
-}
-
-function favoriteIdFor(name = '') {
-  return FAVORITE_TEAM_IDS[cleanName(name)] || undefined;
-}
-
+function addDays(date, days) { return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days); }
+function dateKey(date) { const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, '0'); const day = String(date.getDate()).padStart(2, '0'); return `${year}${month}${day}`; }
+function cleanName(name = '') { return String(name).replace(/\s+/g, ' ').trim(); }
+function favoriteIdFor(name = '') { return FAVORITE_TEAM_IDS[cleanName(name)] || undefined; }
 function teamFromCompetitor(competitor, leagueId) {
   const rawName = cleanName(competitor?.team?.displayName || competitor?.team?.name || competitor?.athlete?.displayName || competitor?.displayName);
-  const favoriteId = favoriteIdFor(rawName);
-  const team = competitor?.team || competitor?.athlete || competitor || {};
-  const id = favoriteId || String(team.id || competitor?.id || rawName).trim();
-  const abbreviation = cleanName(team.abbreviation || competitor?.abbreviation || rawName).toUpperCase();
-  const logoUrl = team.logo || team.logos?.[0]?.href;
-  const primaryColor = team.color || team.colors?.primary;
-  return {
-    id,
-    name: rawName,
-    abbreviation,
-    leagueId,
-    ...(favoriteId ? { favorite: true } : {}),
-    ...(logoUrl ? { logoUrl } : {}),
-    ...(primaryColor ? { primaryColor } : {}),
-  };
+  const favoriteId = favoriteIdFor(rawName); const team = competitor?.team || competitor?.athlete || competitor || {};
+  const id = favoriteId || String(team.id || competitor?.id || rawName).trim(); const abbreviation = cleanName(team.abbreviation || competitor?.abbreviation || rawName).toUpperCase();
+  const logoUrl = team.logo || team.logos?.[0]?.href; const primaryColor = team.color || team.colors?.primary;
+  return { id, name: rawName, abbreviation, leagueId, ...(favoriteId ? { favorite: true } : {}), ...(logoUrl ? { logoUrl } : {}), ...(primaryColor ? { primaryColor } : {}) };
 }
-
 function eventTypeFor(event) {
-  const competition = event?.competitions?.[0];
-  const seasonType = String(event?.season?.slug || event?.season?.type?.slug || '').toLowerCase();
+  const competition = event?.competitions?.[0]; const seasonType = String(event?.season?.slug || event?.season?.type?.slug || '').toLowerCase();
   const typeText = [event?.type?.text, event?.type?.name, event?.status?.type?.name, seasonType].join(' ').toLowerCase();
   if (typeText.includes('championship') || typeText.includes('final')) return 'championship';
   if (typeText.includes('playoff') || typeText.includes('postseason') || typeText.includes('knockout')) return 'playoff';
@@ -95,122 +57,44 @@ function eventTypeFor(event) {
   if (competition?.type?.abbreviation === 'STD') return 'regular-season';
   return 'regular-season';
 }
-
 function statusFor(event) {
   const status = event?.status?.type;
-  if (status?.completed) return 'final';
-  if (status?.state === 'in') return 'live';
-  if (status?.name === 'STATUS_POSTPONED') return 'postponed';
-  if (status?.name === 'STATUS_CANCELED') return 'cancelled';
-  return 'scheduled';
+  if (status?.completed) return 'final'; if (status?.state === 'in') return 'live';
+  if (status?.name === 'STATUS_POSTPONED') return 'postponed'; if (status?.name === 'STATUS_CANCELED') return 'cancelled'; return 'scheduled';
 }
-
-function scoreFor(competitor, scores) {
-  const raw = scores.get(competitor?.id);
-  if (raw == null || raw === '') return undefined;
-  const numeric = Number(raw);
-  return Number.isFinite(numeric) ? numeric : undefined;
+function scoreFor(competitor, scores) { const raw = scores.get(competitor?.id); if (raw == null || raw === '') return undefined; const numeric = Number(raw); return Number.isFinite(numeric) ? numeric : undefined; }
+function clockSecondsFor(displayClock) {
+  if (typeof displayClock !== 'string') return undefined;
+  const match = displayClock.trim().match(/^(?:(\d+):)?(\d+):?(\d+)?$/);
+  if (!match) return undefined;
+  if (match[3] !== undefined) return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
+  return Number(match[1] ?? 0) * 60 + Number(match[2]);
 }
-
 function mapEvent(event, leagueId) {
-  const competition = event?.competitions?.[0];
-  const competitors = competition?.competitors || [];
-  const home = competitors.find((item) => item.homeAway === 'home') || competitors[1];
-  const away = competitors.find((item) => item.homeAway === 'away') || competitors[0];
+  const competition = event?.competitions?.[0]; const competitors = competition?.competitors || [];
+  const home = competitors.find((item) => item.homeAway === 'home') || competitors[1]; const away = competitors.find((item) => item.homeAway === 'away') || competitors[0];
   if (!home || !away || !event?.date) return null;
-
-  const homeTeam = teamFromCompetitor(home, leagueId);
-  const awayTeam = teamFromCompetitor(away, leagueId);
-  const scores = new Map(competitors.map((item) => [item.id, item.score]));
-  const homeScore = scoreFor(home, scores);
-  const awayScore = scoreFor(away, scores);
-  const isCup = leagueId === 'epl-cup';
-  const normalizedLeagueId = isCup ? 'epl' : leagueId;
-
+  const homeTeam = teamFromCompetitor(home, leagueId); const awayTeam = teamFromCompetitor(away, leagueId); const scores = new Map(competitors.map((item) => [item.id, item.score]));
+  const homeScore = scoreFor(home, scores); const awayScore = scoreFor(away, scores); const isCup = leagueId === 'epl-cup'; const normalizedLeagueId = isCup ? 'epl' : leagueId;
+  const displayClock = event?.status?.displayClock; const period = event?.status?.period; const isOvertime = Boolean(event?.status?.period && event?.status?.type?.shortDetail?.toLowerCase?.().includes('ot'));
+  const broadcasts = competition?.broadcasts?.[0]?.names?.join(', ') || competition?.broadcast?.[0]?.names?.join(', ');
   return {
-    id: `espn:${leagueId}:${event.id}`,
-    leagueId: normalizedLeagueId,
-    homeTeamId: homeTeam.id,
-    awayTeamId: awayTeam.id,
-    startTime: event.date,
-    venue: competition?.venue?.fullName || competition?.venue?.address?.city,
-    status: statusFor(event),
-    eventType: eventTypeFor(event),
-    round: event?.week?.text || event?.season?.slug,
-    competitionId: competition?.id || event?.id,
-    competitionPhase: event?.season?.type?.slug,
-    isMajorEvent: Boolean(event?.league?.isTournament || event?.isPostseason || isCup),
-    isElimination: Boolean(event?.isElimination),
-    ...(isCup ? { competitionName: 'Carabao Cup' } : {}),
-    ...(homeScore !== undefined ? { homeScore } : {}),
-    ...(awayScore !== undefined ? { awayScore } : {}),
-    homeTeam: { ...homeTeam, ...(homeScore !== undefined ? { score: homeScore } : {}) },
-    awayTeam: { ...awayTeam, ...(awayScore !== undefined ? { score: awayScore } : {}) },
+    id: `espn:${leagueId}:${event.id}`, leagueId: normalizedLeagueId, homeTeamId: homeTeam.id, awayTeamId: awayTeam.id, startTime: event.date,
+    venue: competition?.venue?.fullName || competition?.venue?.address?.city, status: statusFor(event), eventType: eventTypeFor(event), round: event?.week?.text || event?.season?.slug,
+    competitionId: competition?.id || event?.id, competitionPhase: event?.season?.type?.slug, isMajorEvent: Boolean(event?.league?.isTournament || event?.isPostseason || isCup),
+    isElimination: Boolean(event?.isElimination), ...(isCup ? { competitionName: 'Carabao Cup' } : {}),
+    ...(homeScore !== undefined ? { homeScore } : {}), ...(awayScore !== undefined ? { awayScore } : {}),
+    ...(period !== undefined ? { period: Number(period) } : {}), ...(displayClock ? { clock: displayClock } : {}),
+    ...(clockSecondsFor(displayClock) !== undefined ? { clockSeconds: clockSecondsFor(displayClock) } : {}), ...(isOvertime ? { isOvertime: true } : {}),
+    ...(broadcasts ? { network: broadcasts } : {}),
+    homeTeam: { ...homeTeam, ...(homeScore !== undefined ? { score: homeScore } : {}) }, awayTeam: { ...awayTeam, ...(awayScore !== undefined ? { score: awayScore } : {}) },
   };
 }
-
-function fallbackUrlFor(url) {
-  return url.replace('https://site.api.espn.com', 'https://site.web.api.espn.com');
-}
-
-function shouldTryFallback(error) {
-  return error?.status === 403 || error?.name === 'TypeError' || /Network connection lost|fetch failed/i.test(error?.message || '');
-}
-
-async function requestJson(url) {
-  const response = await fetch(url, { headers: ESPN_HEADERS });
-  if (!response.ok) {
-    const error = new Error(`ESPN returned ${response.status}`);
-    error.status = response.status;
-    throw error;
-  }
-  return response.json();
-}
-
-async function fetchJson(url) {
-  try {
-    return await requestJson(url);
-  } catch (primaryError) {
-    if (!shouldTryFallback(primaryError)) throw primaryError;
-
-    await new Promise((resolve) => setTimeout(resolve, 150));
-
-    try {
-      return await requestJson(fallbackUrlFor(url));
-    } catch (fallbackError) {
-      const error = new Error(
-        `${primaryError.message}; fallback ${fallbackError.message}`,
-      );
-      error.status = fallbackError.status || primaryError.status;
-      throw error;
-    }
-  }
-}
-
-function normalizeEvents(payload, leagueId) {
-  const events = Array.isArray(payload?.events) ? payload.events : [];
-  return normalizeGames(events.map((event) => mapEvent(event, leagueId)).filter(Boolean));
-}
-
-export async function fetchEspnLeagueWindow(leagueId, startDate, days = 7) {
-  const config = LEAGUE_CONFIG[leagueId];
-  if (!config) throw new Error(`Unsupported ESPN league: ${leagueId}`);
-  const endDate = addDays(startDate, days - 1);
-  const url = `${ESPN_BASE}/${config.sport}/${config.league}/scoreboard?dates=${dateKey(startDate)}-${dateKey(endDate)}`;
-  const payload = await fetchJson(url);
-  return normalizeEvents(payload, leagueId);
-}
-
-export async function fetchEspnTeamWindow(teamId, startDate, days = 7) {
-  const favorite = FAVORITE_TEAMS[teamId];
-  if (!favorite) throw new Error(`Unsupported favorite team: ${teamId}`);
-  const endDate = addDays(startDate, days - 1);
-  const url = `${ESPN_BASE}/${favorite.sport}/${favorite.league}/teams/${favorite.externalId}/schedule?dates=${dateKey(startDate)}-${dateKey(endDate)}`;
-  const payload = await fetchJson(url);
-  const leagueId = favorite.league === 'eng.1' ? 'epl' : favorite.league === 'esp.1' ? 'laliga' : Object.keys(LEAGUE_CONFIG).find((key) => LEAGUE_CONFIG[key].sport === favorite.sport && LEAGUE_CONFIG[key].league === favorite.league) || favorite.league;
-  return normalizeEvents(payload, leagueId);
-}
-
-export function favoriteTeamIds() {
-  return Object.keys(FAVORITE_TEAMS);
-}
+function fallbackUrlFor(url) { return url.replace(ESPN_BASE, ESPN_FALLBACK_BASE); }
+function shouldTryFallback(error) { return error?.status === 403 || error?.name === 'TypeError' || /Network connection lost|fetch failed/i.test(error?.message || ''); }
+async function requestJson(url) { const response = await fetch(url, { headers: ESPN_HEADERS }); if (!response.ok) { const error = new Error(`ESPN returned ${response.status}`); error.status = response.status; throw error; } return response.json(); }
+async function fetchJson(url) { try { return await requestJson(url); } catch (primaryError) { if (!shouldTryFallback(primaryError)) throw primaryError; await new Promise((resolve) => setTimeout(resolve, 150)); try { return await requestJson(fallbackUrlFor(url)); } catch (fallbackError) { const error = new Error(`${primaryError.message}; fallback ${fallbackError.message}`); error.status = fallbackError.status || primaryError.status; throw error; } } }
+function normalizeEvents(payload, leagueId) { const events = Array.isArray(payload?.events) ? payload.events : []; return normalizeGames(events.map((event) => mapEvent(event, leagueId)).filter(Boolean)); }
+export async function fetchEspnLeagueWindow(leagueId, startDate, days = 7) { const config = LEAGUE_CONFIG[leagueId]; if (!config) throw new Error(`Unsupported ESPN league: ${leagueId}`); const endDate = addDays(startDate, days - 1); const url = `${ESPN_BASE}/${config.sport}/${config.league}/scoreboard?dates=${dateKey(startDate)}-${dateKey(endDate)}`; return normalizeEvents(await fetchJson(url), leagueId); }
+export async function fetchEspnTeamWindow(teamId, startDate, days = 7) { const favorite = FAVORITE_TEAMS[teamId]; if (!favorite) throw new Error(`Unsupported favorite team: ${teamId}`); const endDate = addDays(startDate, days - 1); const url = `${ESPN_BASE}/${favorite.sport}/${favorite.league}/teams/${favorite.externalId}/schedule?dates=${dateKey(startDate)}-${dateKey(endDate)}`; const leagueId = favorite.league === 'eng.1' ? 'epl' : favorite.league === 'esp.1' ? 'laliga' : Object.keys(LEAGUE_CONFIG).find((key) => LEAGUE_CONFIG[key].sport === favorite.sport && LEAGUE_CONFIG[key].league === favorite.league) || favorite.league; return normalizeEvents(await fetchJson(url), leagueId); }
+export function favoriteTeamIds() { return Object.keys(FAVORITE_TEAMS); }
