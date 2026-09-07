@@ -1,5 +1,3 @@
-import { normalizeGames } from './normalizer.js';
-
 const ESPN_STANDINGS = {
   nfl: { sport: 'football', league: 'nfl', seasonType: '2' },
   nba: { sport: 'basketball', league: 'nba', seasonType: '2' },
@@ -110,31 +108,37 @@ function standingsUrl(leagueId, year) {
   url.searchParams.set('seasontype', config.seasonType);
   return url.toString();
 }
+async function getCachedStandings(leagueId, year) {
+  const key = `standings:${leagueId}:${year}`;
+  const hit = standingsCache.get(key);
+  if (hit && hit.expiresAt > Date.now()) return { entries: hit.entries, cached: true, durationMs: 0, provider: hit.provider };
+  const started = Date.now();
+  const fetched = await fetchJson(standingsUrl(leagueId, year));
+  const entries = getEntries(fetched.data);
+  const durationMs = Date.now() - started || fetched.durationMs;
+  standingsCache.set(key, { entries, provider: fetched.provider, expiresAt: Date.now() + STANDINGS_CACHE_SECONDS * 1000 });
+  return { entries, cached: false, durationMs, provider: fetched.provider };
+}
+
 export async function fetchEspnStandings(leagueId, year = new Date().getFullYear()) {
   if (!ESPN_STANDINGS[leagueId]) return [];
-  const fetched = await fetchJson(standingsUrl(leagueId, year));
-  return getEntries(fetched.data);
+  return (await getCachedStandings(leagueId, year)).entries;
 }
+
 export async function enrichGamesWithEspnStandings(games, year = new Date().getFullYear()) {
   const leagueIds = [...new Set(games.map((game) => game.leagueId))].filter((leagueId) => ESPN_STANDINGS[leagueId]);
-  const results = await Promise.allSettled(leagueIds.map(async (leagueId) => {
-    const key = `standings:${leagueId}:${year}`;
-    const hit = standingsCache.get(key);
-    if (hit && hit.expiresAt > Date.now()) return [leagueId, hit.entries, { cached: true, durationMs: 0, provider: hit.provider }];
-    const started = Date.now();
-    const fetched = await fetchJson(standingsUrl(leagueId, year));
-    const entries = getEntries(fetched.data);
-    standingsCache.set(key, { entries, provider: fetched.provider, expiresAt: Date.now() + STANDINGS_CACHE_SECONDS * 1000 });
-    return [leagueId, entries, { cached: false, durationMs: Date.now() - started || fetched.durationMs, provider: fetched.provider }];
-  }));
+  const results = await Promise.allSettled(leagueIds.map(async (leagueId) => [leagueId, await getCachedStandings(leagueId, year)]));
   const byLeague = new Map();
   const diagnostics = [];
   for (const result of results) {
     if (result.status !== 'fulfilled') continue;
-    const [leagueId, entries, timing] = result.value;
-    byLeague.set(leagueId, new Map(entries.map((entry) => [clean(entry.name), entry])));
-    diagnostics.push({ leagueId, provider: timing.provider, cached: timing.cached, durationMs: timing.durationMs, count: entries.length });
+    const [leagueId, standings] = result.value;
+    byLeague.set(leagueId, new Map(standings.entries.map((entry) => [clean(entry.name), entry])));
+    diagnostics.push({ leagueId, provider: standings.provider, cached: standings.cached, durationMs: standings.durationMs, count: standings.entries.length });
   }
-  return { games: normalizeGames(games.map((game) => enrichGame(game, byLeague.get(game.leagueId) ?? new Map()))), diagnostics };
+  const enriched = games.map((game) => enrichGame(game, byLeague.get(game.leagueId) ?? new Map()));
+  enriched.diagnostics = diagnostics;
+  return enriched;
 }
+
 export { ESPN_STANDINGS };
