@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { leagues } from '../sports/leagues.js';
+import { getPriorityTier } from '../sports/priority.js';
 import { GameCard } from './GameCard.jsx';
 
 const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 function leagueColor(leagueId) {
   const league = leagues.find((item) => item.id === leagueId);
@@ -29,6 +29,10 @@ function addDays(date, days) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 }
 
+function isPriority(game) {
+  return getPriorityTier(game) <= 2 || game.isMajorEvent;
+}
+
 export function CalendarView({ games, cursor, onShiftWeek }) {
   const [selectedDateKey, setSelectedDateKey] = useState(null);
   const weekStart = startOfWeek(cursor);
@@ -49,7 +53,7 @@ export function CalendarView({ games, cursor, onShiftWeek }) {
   const totalGames = visibleDays.reduce((sum, date) => sum + (gamesByDate.get(getDateKey(date)) || []).length, 0);
   const priorityGames = visibleDays.reduce((sum, date) => {
     const dayGames = gamesByDate.get(getDateKey(date)) || [];
-    return sum + dayGames.filter((game) => game.priorityTier <= 2 || game.isMajorEvent).length;
+    return sum + dayGames.filter(isPriority).length;
   }, 0);
 
   return (
@@ -86,7 +90,7 @@ export function CalendarView({ games, cursor, onShiftWeek }) {
             const dateKey = getDateKey(date);
             const dayGames = gamesByDate.get(dateKey) || [];
             const hasLive = dayGames.some((game) => game.status === 'live');
-            const hasPriority = dayGames.some((game) => game.priorityTier <= 2 || game.isMajorEvent);
+            const hasPriority = dayGames.some(isPriority);
 
             return (
               <button
@@ -101,7 +105,7 @@ export function CalendarView({ games, cursor, onShiftWeek }) {
                   <div className="game-dots" aria-hidden="true">
                     {dayGames.slice(0, 8).map((game) => (
                       <span
-                        className={`game-dot ${game.status === 'live' ? 'live' : ''} ${game.priorityTier <= 2 || game.isMajorEvent ? 'priority' : ''}`}
+                        className={`game-dot ${game.status === 'live' ? 'live' : ''} ${isPriority(game) ? 'priority' : ''}`}
                         key={game.id}
                         style={{ '--dot-color': leagueColor(game.leagueId) }}
                       />
