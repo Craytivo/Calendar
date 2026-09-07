@@ -11,7 +11,6 @@ export function createSportsAdapter({ provider, fetchGames }) {
 
   return {
     provider,
-
     async getGames(options = {}) {
       const rawGames = await fetchGames(options);
       return normalizeGames(rawGames);
@@ -20,3 +19,4 @@ export function createSportsAdapter({ provider, fetchGames }) {
 }
 
 export { normalizeGame, normalizeGames, normalizeStatus, normalizeTeam, normalizeTeamContext, isNormalizedGame } from './normalizer.js';
+export { THESPORTSDB_LEAGUES, normalizeTheSportsDbEvents, getTheSportsDbLeague } from './thesportsdb.js';
