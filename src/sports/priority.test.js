@@ -1,5 +1,5 @@
-import { getPriorityTier, PRIORITY_TEST_EXPECTATIONS, sortGamesByPriority } from './priority';
-import { validGames } from './games';
+import { getPriorityTier, sortGamesByPriority } from './priority.js';
+import { validGames } from './games.js';
 
 const expectedById = {
   'ucl-test-1': 0,
@@ -14,41 +14,44 @@ const expectedById = {
   'normal-test-1': 5,
 };
 
-export function runPriorityChecks() {
-  const results = Object.entries(expectedById).map(([gameId, expectedTier]) => {
-    const game = validGames.find((candidate) => candidate.id === gameId);
-    const actualTier = game ? getPriorityTier(game) : null;
+const expectedOrder = [
+  'ucl-test-1',
+  'oregon-test-1',
+  'tottenham-test-1',
+  'ufc-test-1',
+  'kings-test-1',
+  'blue-jays-test-1',
+  'oilers-test-1',
+  'super-bowl-test-1',
+  'rivalry-test-1',
+  'normal-test-1',
+];
 
-    return {
-      gameId,
-      expectedTier,
-      actualTier,
-      passed: actualTier === expectedTier,
-    };
-  });
-
-  const failed = results.filter((result) => !result.passed);
-
-  if (failed.length > 0) {
-    throw new Error(
-      `Priority checks failed: ${failed
-        .map((result) => `${result.gameId} expected ${result.expectedTier}, got ${result.actualTier}`)
-        .join('; ')}`,
-    );
+function assert(condition, message) {
+  if (!condition) {
+    throw new Error(message);
   }
-
-  const sortedIds = sortGamesByPriority(validGames).map((game) => game.id);
-  const expectedOrder = Object.entries(expectedById)
-    .sort(([, a], [, b]) => a - b)
-    .map(([gameId]) => gameId);
-
-  if (JSON.stringify(sortedIds) !== JSON.stringify(expectedOrder)) {
-    throw new Error(
-      `Priority sorting failed. Expected ${expectedOrder.join(', ')}, got ${sortedIds.join(', ')}`,
-    );
-  }
-
-  return results;
 }
 
-export const PRIORITY_TEST_EXPECTATIONS = expectedById;
+export function runPriorityChecks() {
+  for (const [gameId, expectedTier] of Object.entries(expectedById)) {
+    const game = validGames.find((candidate) => candidate.id === gameId);
+    assert(game, `Missing test game: ${gameId}`);
+
+    const actualTier = getPriorityTier(game);
+    assert(
+      actualTier === expectedTier,
+      `${gameId} expected priority ${expectedTier}, got ${actualTier}`,
+    );
+  }
+
+  const actualOrder = sortGamesByPriority(validGames).map((game) => game.id);
+  assert(
+    JSON.stringify(actualOrder) === JSON.stringify(expectedOrder),
+    `Expected sorted order ${expectedOrder.join(', ')}, got ${actualOrder.join(', ')}`,
+  );
+
+  return true;
+}
+
+runPriorityChecks();
