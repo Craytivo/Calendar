@@ -7,6 +7,7 @@ import {
 } from './priority.js';
 
 const MY_GAMES_WINDOW_DAYS = 7;
+const MY_GAMES_SECTION_LIMIT = 5;
 
 const favoriteTeamIds = new Set(
   teams.filter((team) => team.favorite).map((team) => team.id),
@@ -74,33 +75,12 @@ function isLive(game) {
   return game.status === 'live';
 }
 
-function isNonFavoriteMajor(game) {
-  return !isFavoriteGame(game) && (
-    isMajorEvent(game) ||
-    isMajorGameForPriority(game)
-  );
-}
-
-function isNonFavoriteMajorUcl(game) {
-  return !isFavoriteGame(game) && isMajorUclGameForPriority(game);
-}
-
 function compareForDisplay(a, b) {
   const liveDifference = Number(isLive(b)) - Number(isLive(a));
-  if (liveDifference !== 0) {
-    return liveDifference;
-  }
+  if (liveDifference !== 0) return liveDifference;
 
-  const priorityOrder = sortGamesByPriority([a, b]);
-  const firstId = priorityOrder[0]?.id;
-
-  if (firstId === a.id && firstId !== b.id) {
-    return -1;
-  }
-
-  if (firstId === b.id && firstId !== a.id) {
-    return 1;
-  }
+  const priorityDifference = getPriorityTier(a) - getPriorityTier(b);
+  if (priorityDifference !== 0) return priorityDifference;
 
   return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
 }
@@ -125,36 +105,7 @@ export function getMyGamesWindow(games, now = new Date()) {
 }
 
 export function getMyGames(games, now = new Date()) {
-  const windowGames = getMyGamesWindow(games, now);
-  const byDate = new Map();
-
-  for (const game of windowGames) {
-    const key = getLocalDateKey(new Date(game.startTime));
-    if (!byDate.has(key)) byDate.set(key, []);
-    byDate.get(key).push(game);
-  }
-
-  const selected = [];
-
-  for (const dayGames of byDate.values()) {
-    const favorites = dayGames.filter(isFavoriteGame);
-    const nonFavoriteCandidates = dayGames.filter(
-      (game) => isNonFavoriteMajor(game) || isNonFavoriteMajorUcl(game),
-    );
-    const selectedNonFavorites = sortGamesByPriority(nonFavoriteCandidates).slice(0, 3);
-    selected.push(...favorites, ...selectedNonFavorites);
-  }
-
-  // NFL regular-season games are in the user's category scope and must remain
-  // available to the top-5 Today/Next Week presentation. Keep all NFL games
-  // here; the view layer decides which five to surface.
-  selected.push(...windowGames.filter((game) => game.leagueId === 'nfl' && !selected.some((item) => item.id === game.id)));
-
-  const selectedIds = new Set(selected.map((game) => game.id));
-
-  return windowGames
-    .filter((game) => selectedIds.has(game.id))
-    .sort(compareForDisplay);
+  return getMyGamesWindow(games, now);
 }
 
 export function getTodayMyGames(games, now = new Date()) {
@@ -165,7 +116,25 @@ export function getTodayMyGames(games, now = new Date()) {
 }
 
 export function getUpcomingMyGames(games, now = new Date()) {
-  return getMyGames(games, now);
+  const todayKey = getLocalDateKey(now);
+  return getMyGames(games, now).filter(
+    (game) => getLocalDateKey(new Date(game.startTime)) !== todayKey,
+  );
+}
+
+export function getMyGamesSections(games, now = new Date()) {
+  const allGames = getMyGames(games, now);
+  const todayKey = getLocalDateKey(now);
+
+  const today = allGames
+    .filter((game) => getLocalDateKey(new Date(game.startTime)) === todayKey)
+    .slice(0, MY_GAMES_SECTION_LIMIT);
+
+  const upcoming = allGames
+    .filter((game) => getLocalDateKey(new Date(game.startTime)) !== todayKey)
+    .slice(0, MY_GAMES_SECTION_LIMIT);
+
+  return { today, upcoming };
 }
 
 export function groupMyGamesByDate(games, now = new Date()) {
