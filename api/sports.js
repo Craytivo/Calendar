@@ -13,10 +13,25 @@ const ESPN_SCHEDULE_LEAGUES = [
 ];
 const SOCCER_STANDING_LEAGUES = ['ucl', 'laliga', 'epl'];
 
-function addDays(date, days) { return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days); }
+function addDays(date, days) { return new Date(date.getTime() + days * 86400000); }
 function dateKey(date) { return date.toISOString().slice(0, 10); }
+function todayInTimeZone(timeZone) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+    return new Date(Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day)));
+  } catch {
+    const now = new Date();
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  }
+}
 function seasonFor(leagueId, date) {
-  const year = date.getFullYear();
+  const year = date.getUTCFullYear();
   return ['epl', 'laliga', 'nba', 'nhl'].includes(leagueId) ? `${year}-${year + 1}` : String(year);
 }
 
@@ -89,14 +104,15 @@ export default async function handler(req, res) {
 
   const requestedDays = Number(req.query?.days ?? WINDOW_DAYS);
   const days = Number.isFinite(requestedDays) ? Math.min(Math.max(Math.floor(requestedDays), 1), WINDOW_DAYS) : WINDOW_DAYS;
-  const today = new Date();
+  const timeZone = String(req.query?.timezone || 'UTC');
+  const today = todayInTimeZone(timeZone);
   const end = addDays(today, days);
   const startKey = dateKey(today);
   const endKey = dateKey(end);
 
   const games = [];
   const sources = [];
-  const diagnostics = { standings: [], favorites: [] };
+  const diagnostics = { timezone: timeZone, standings: [], favorites: [] };
 
   const scheduleResults = await Promise.allSettled(
     ESPN_SCHEDULE_LEAGUES.map(async (leagueId) => [leagueId, await fetchEspnLeagueWindow(leagueId, today, days)]),
@@ -114,15 +130,13 @@ export default async function handler(req, res) {
     }
   });
 
-  // Always query the six favorite teams directly as a second schedule path.
-  // This catches cross-competition games (UCL/cups) that may not be returned
-  // by a domestic league scoreboard, while deduplication below keeps one game.
+  const favoriteIds = favoriteTeamIds();
   const favoriteResults = await Promise.allSettled(
-    favoriteTeamIds().map(async (teamId) => [teamId, await fetchEspnTeamWindow(teamId, today, days)]),
+    favoriteIds.map(async (teamId) => [teamId, await fetchEspnTeamWindow(teamId, today, days)]),
   );
 
   favoriteResults.forEach((result, index) => {
-    const teamId = favoriteTeamIds()[index];
+    const teamId = favoriteIds[index];
     if (result.status === 'fulfilled') {
       const [, teamGames] = result.value;
       const normalized = teamGames.filter((game) => inWindow(game, startKey, endKey));
@@ -153,7 +167,7 @@ export default async function handler(req, res) {
   try {
     const withSoccerStandings = applySoccerStandings(games, tablesByLeague);
     const withDomesticRaceContext = applyDomesticSoccerRaceContext(withSoccerStandings);
-    enrichedGames = await enrichGamesWithEspnStandings(withDomesticRaceContext, today.getFullYear());
+    enrichedGames = await enrichGamesWithEspnStandings(withDomesticRaceContext, today.getUTCFullYear());
     diagnostics.standings.push(sourceRecord('espn-major-sports', 'Major sports standings', 'ESPN standings', 'ok'));
   } catch (error) {
     diagnostics.standings.push(sourceRecord('espn-major-sports', 'Major sports standings', 'ESPN standings', 'error', 0, errorMessage(error)));
