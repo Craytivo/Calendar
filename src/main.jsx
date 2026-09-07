@@ -14,7 +14,8 @@ import './styles-polish.css';
 
 const viewerTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 const LIVE_REFRESH_MS = 30_000;
-const IDLE_REFRESH_MS = 60_000;
+const IDLE_LIVE_REFRESH_MS = 60_000;
+const CALENDAR_REFRESH_MS = 300_000;
 
 function formatFreshness(date, loading) {
   if (loading && !date) return 'Updating data…';
@@ -24,6 +25,23 @@ function formatFreshness(date, loading) {
   if (ageSeconds < 60) return `Updated ${ageSeconds}s ago`;
   const minutes = Math.floor(ageSeconds / 60);
   return `Updated ${minutes}m ago`;
+}
+
+function localDateKey(date) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: viewerTimeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(date));
+}
+
+function mergeLiveGames(currentGames, liveGames) {
+  if (!liveGames.length) return currentGames;
+  const updates = new Map(liveGames.map((game) => [game.id, game]));
+  const merged = currentGames.map((game) => updates.get(game.id) ? { ...game, ...updates.get(game.id) } : game);
+  const existingIds = new Set(currentGames.map((game) => game.id));
+  return [...merged, ...liveGames.filter((game) => !existingIds.has(game.id))];
 }
 
 function App() {
@@ -60,17 +78,51 @@ function App() {
     }
   };
 
+  const todayLeagueIds = useMemo(() => {
+    const ids = new Set();
+    for (const game of games) {
+      if (localDateKey(game.startTime) === localDateKey(Date.now())) ids.add(game.leagueId);
+    }
+    return Array.from(ids).sort();
+  }, [games]);
+
+  const todayLeagueQuery = todayLeagueIds.join(',');
+  const hasLiveGames = games.some((game) => game.status === 'live');
+
+  const loadLiveGames = async ({ silent = true } = {}) => {
+    if (!todayLeagueQuery) return;
+    try {
+      const response = await fetch(`/api/sports?mode=live&leagues=${encodeURIComponent(todayLeagueQuery)}&timezone=${encodeURIComponent(viewerTimeZone)}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Live sports data unavailable');
+      const payload = await response.json();
+      const liveGames = payload.games ?? [];
+      setGames((current) => mergeLiveGames(current, liveGames));
+      setSelectedGame((current) => current ? liveGames.find((game) => game.id === current.id) ? { ...current, ...liveGames.find((game) => game.id === current.id) } : current : current);
+      if (liveGames.length) setLastUpdated(payload.fetchedAt ?? new Date().toISOString());
+    } catch (err) {
+      if (!silent) setError(err.message || 'Unable to load live sports data');
+    }
+  };
+
   useEffect(() => { loadGames(); }, []);
 
-  const hasLiveGames = games.some((game) => game.status === 'live');
   useEffect(() => {
-    const refreshMs = hasLiveGames ? LIVE_REFRESH_MS : IDLE_REFRESH_MS;
     const timer = window.setInterval(() => {
       setFreshnessNow(Date.now());
       void loadGames({ silent: true });
+    }, CALENDAR_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!todayLeagueQuery) return undefined;
+    const refreshMs = hasLiveGames ? LIVE_REFRESH_MS : IDLE_LIVE_REFRESH_MS;
+    const timer = window.setInterval(() => {
+      setFreshnessNow(Date.now());
+      void loadLiveGames();
     }, refreshMs);
     return () => window.clearInterval(timer);
-  }, [hasLiveGames]);
+  }, [todayLeagueQuery, hasLiveGames]);
 
   const filteredGames = useMemo(() => games
     .filter((game) => activeLeagues.includes(game.leagueId))
@@ -115,7 +167,7 @@ function App() {
 
       <footer>
         <span>{loading ? 'Loading sports data…' : `${filteredMyGames.length} games in your 7-day view`}</span>
-        <span className="data-freshness" title={hasLiveGames ? 'Live games refresh automatically every 30 seconds' : 'Sports data refreshes automatically every 60 seconds'}>{freshnessLabel}</span>
+        <span className="data-freshness" title={hasLiveGames ? 'Live scoreboards refresh automatically every 30 seconds; the full calendar refreshes every 5 minutes' : 'Live scoreboards refresh automatically every 60 seconds when today has games; the full calendar refreshes every 5 minutes'}>{freshnessLabel}</span>
       </footer>
 
       <FilterSheet
