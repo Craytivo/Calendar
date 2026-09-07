@@ -12,12 +12,19 @@ const favoriteTeamIds = new Set(
     .map((team) => team.id),
 );
 
+const realMadridTeamIds = new Set(['real-madrid']);
+
 function gameHasTeam(game, teamIds) {
   return teamIds.has(game.homeTeamId) || teamIds.has(game.awayTeamId);
 }
 
 function bothTeamsMeet(game, predicate) {
-  return Boolean(game.homeTeam && game.awayTeam && predicate(game.homeTeam) && predicate(game.awayTeam));
+  return Boolean(
+    game.homeTeam &&
+      game.awayTeam &&
+      predicate(game.homeTeam) &&
+      predicate(game.awayTeam),
+  );
 }
 
 function isPlayoffOrPostseason(game) {
@@ -33,7 +40,11 @@ function isEliminationGame(game) {
 }
 
 function hasMeaningfulImplications(game) {
-  return game.hasPlayoffImplications === true || game.hasSeedingImplications === true || game.hasQualificationImplications === true;
+  return (
+    game.hasPlayoffImplications === true ||
+    game.hasSeedingImplications === true ||
+    game.hasQualificationImplications === true
+  );
 }
 
 function isKnockoutGame(game) {
@@ -153,8 +164,14 @@ function isMajorUclGame(game) {
     return false;
   }
 
-  const realMadridGame = gameHasTeam(game, new Set(['real-madrid']));
-  return realMadridGame || isKnockoutGame(game) || isMajorGame({ ...game, leagueId: 'nfl' });
+  return (
+    gameHasTeam(game, realMadridTeamIds) ||
+    isKnockoutGame(game) ||
+    isChampionship(game) ||
+    isEliminationGame(game) ||
+    game.isMajorEvent === true ||
+    hasMeaningfulImplications(game)
+  );
 }
 
 /**
@@ -197,6 +214,10 @@ export function isMajorGameForPriority(game) {
   return isMajorGame(game);
 }
 
+export function isMajorUclGameForPriority(game) {
+  return isMajorUclGame(game);
+}
+
 export function getPriorityLabel(tier) {
   const labels = {
     [PRIORITY_TIERS.CHAMPIONS_LEAGUE]: 'Champions League',
@@ -211,14 +232,13 @@ export function getPriorityLabel(tier) {
 }
 
 function getSecondaryPriority(game) {
-  const favorite = gameHasTeam(game, favoriteTeamIds);
-  const favoriteRivalry = favorite && game.isRivalry === true;
+  const favoriteRivalry = gameHasTeam(game, favoriteTeamIds) && game.isRivalry === true;
 
   if (favoriteRivalry) {
     return 0;
   }
 
-  if (isMajorGame(game)) {
+  if (isMajorGame(game) || isMajorUclGame(game)) {
     return 1;
   }
 
