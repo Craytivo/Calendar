@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { access, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const leagueSources = {
@@ -13,9 +13,6 @@ const favoriteLogos = {
   'real-madrid': { url: 'https://a.espncdn.com/i/teamlogos/soccer/500/86.png' },
   tottenham: { url: 'https://a.espncdn.com/i/teamlogos/soccer/500/367.png' },
   'blue-jays': { league: 'mlb', externalId: '14' },
-  // ESPN's MLB team endpoint does not reliably expose the Dodgers logo through
-  // the /teams/:id response during Vercel builds. Use the canonical ESPN CDN
-  // asset directly so the required local favorite asset is deterministic.
   dodgers: { url: 'https://a.espncdn.com/i/teamlogos/mlb/500/lad.png' },
   oilers: { url: 'https://a.espncdn.com/i/teamlogos/nhl/500/25.png' },
   vikings: { league: 'nfl', externalId: '16' },
@@ -41,9 +38,19 @@ async function saveLogo(url, outputPath) {
   await writeFile(outputPath, buffer);
 }
 
+async function fileExists(filePath) {
+  try {
+    await access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const failures = [];
 
-// Download every NFL, NBA, and MLB team logo for broad My Games coverage.
+// Local logo assets are persistent build inputs. Existing files are reused so
+// normal builds never redownload or rewrite the logo tree.
 for (const [leagueId, source] of Object.entries(leagueSources)) {
   try {
     const payload = await fetchJson(`${ESPN_BASE}/${source.sport}/${source.league}/teams?limit=100`);
@@ -53,20 +60,27 @@ for (const [leagueId, source] of Object.entries(leagueSources)) {
     for (const team of teams) {
       const logoUrl = team.logos?.[0]?.href || team.logo;
       if (!logoUrl || !team.id) continue;
+      const outputPath = path.join(outputDir, leagueId, `${team.id}.png`);
+      if (await fileExists(outputPath)) continue;
       try {
-        await saveLogo(logoUrl, path.join(outputDir, leagueId, `${team.id}.png`));
+        await saveLogo(logoUrl, outputPath);
         console.log(`Saved local ${leagueId} logo: ${team.id}`);
       } catch (error) {
         failures.push(`${leagueId}/${team.id}: ${error.message}`);
       }
     }
   } catch (error) {
-    failures.push(`${leagueId}: ${error.message}`);
+    // If the local league assets already exist, an upstream outage should not
+    // make an otherwise healthy build fail.
+    const leagueDir = path.join(outputDir, leagueId);
+    if (!(await fileExists(leagueDir))) failures.push(`${leagueId}: ${error.message}`);
   }
 }
 
-// Favorite teams outside NFL/NBA/MLB must also remain local canonical assets.
 for (const [teamId, favorite] of Object.entries(favoriteLogos)) {
+  const outputPath = path.join(outputDir, `${teamId}.png`);
+  if (await fileExists(outputPath)) continue;
+
   try {
     let logoUrl = favorite.url;
     if (!logoUrl) {
@@ -76,7 +90,7 @@ for (const [teamId, favorite] of Object.entries(favoriteLogos)) {
       logoUrl = team?.logos?.[0]?.href || team?.logo;
     }
     if (!logoUrl) throw new Error('no logo returned');
-    await saveLogo(logoUrl, path.join(outputDir, `${teamId}.png`));
+    await saveLogo(logoUrl, outputPath);
     console.log(`Saved local favorite logo: ${teamId}`);
   } catch (error) {
     failures.push(`${teamId}: ${error.message}`);
@@ -84,7 +98,7 @@ for (const [teamId, favorite] of Object.entries(favoriteLogos)) {
 }
 
 if (failures.length) {
-  console.error('Local logo download failed. Refusing to build with missing required logo assets.');
+  console.error('Local logo download failed. Missing logo assets:');
   for (const failure of failures) console.error(` - ${failure}`);
   process.exit(1);
 }
