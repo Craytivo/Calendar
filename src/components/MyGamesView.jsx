@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Radio } from 'lucide-react';
 import { getMyGamesSections } from '../sports/selectors.js';
 import { GameCard } from './GameCard.jsx';
-import { GameDetailModal } from './GameDetailModal.jsx';
 
 function Section({ eyebrow, title, games, emptyMessage, onOpenGame }) {
   return (
@@ -26,9 +25,8 @@ function Section({ eyebrow, title, games, emptyMessage, onOpenGame }) {
   );
 }
 
-export function MyGamesView({ games, now }) {
+export function MyGamesView({ games, now, onOpenGame }) {
   const { today, upcoming } = getMyGamesSections(games, now);
-  const [selectedGame, setSelectedGame] = useState(null);
   const liveGames = today.filter((game) => game.status === 'live');
   const hasGames = today.length > 0 || upcoming.length > 0;
 
@@ -56,7 +54,7 @@ export function MyGamesView({ games, now }) {
         eyebrow="Today"
         title="Today's Games"
         games={today}
-        onOpenGame={setSelectedGame}
+        onOpenGame={onOpenGame}
         emptyMessage="No games from your category scope today."
       />
 
@@ -64,11 +62,9 @@ export function MyGamesView({ games, now }) {
         eyebrow="Next 6 Days"
         title="Next Week"
         games={upcoming}
-        onOpenGame={setSelectedGame}
+        onOpenGame={onOpenGame}
         emptyMessage="No games from your category scope in the next six days."
       />
-
-      <GameDetailModal game={selectedGame} onClose={() => setSelectedGame(null)} />
     </div>
   );
 }
