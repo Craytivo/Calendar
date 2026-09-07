@@ -8,6 +8,7 @@ import {
 
 const MY_GAMES_WINDOW_DAYS = 7;
 const MY_GAMES_SECTION_LIMIT = 5;
+const NCAA_TOP_25_RANKING = 25;
 
 const favoriteTeamIds = new Set(
   teams.filter((team) => team.favorite).map((team) => team.id),
@@ -51,6 +52,17 @@ function isMustSeeGame(game) {
   return gameHasTeam(game, mustSeeTeamIds);
 }
 
+function isNcaaTop25Game(game) {
+  if (game.leagueId !== 'ncaa-football') return false;
+
+  const isRankedTop25 = (team) => {
+    const ranking = Number(team?.ranking);
+    return Number.isFinite(ranking) && ranking >= 1 && ranking <= NCAA_TOP_25_RANKING;
+  };
+
+  return isRankedTop25(game.homeTeam) || isRankedTop25(game.awayTeam);
+}
+
 function isMajorEvent(game) {
   return (
     game.isMajorEvent === true ||
@@ -67,6 +79,7 @@ function isDisplayableMyGame(game) {
     isMajorGameForPriority(game) ||
     isMajorUclGameForPriority(game) ||
     game.leagueId === 'nfl' ||
+    isNcaaTop25Game(game) ||
     (game.leagueId === 'ufc' && game.eventType === 'main-card')
   );
 }
