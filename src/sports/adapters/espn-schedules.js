@@ -23,6 +23,7 @@ const FAVORITE_TEAMS = {
   'real-madrid': { name: 'Real Madrid', sport: 'soccer', league: 'esp.1', externalId: '86' },
   tottenham: { name: 'Tottenham Hotspur', sport: 'soccer', league: 'eng.1', externalId: '367' },
   'blue-jays': { name: 'Toronto Blue Jays', sport: 'baseball', league: 'mlb', externalId: '14' },
+  dodgers: { name: 'Los Angeles Dodgers', sport: 'baseball', league: 'mlb', externalId: '119' },
   oilers: { name: 'Edmonton Oilers', sport: 'hockey', league: 'nhl', externalId: '25' },
   vikings: { name: 'Minnesota Vikings', sport: 'football', league: 'nfl', externalId: '16' },
 };
@@ -35,6 +36,8 @@ const FAVORITE_TEAM_IDS = {
   Tottenham: 'tottenham',
   'Tottenham Hotspur': 'tottenham',
   'Toronto Blue Jays': 'blue-jays',
+  'Los Angeles Dodgers': 'dodgers',
+  Dodgers: 'dodgers',
   'Edmonton Oilers': 'oilers',
   'Minnesota Vikings': 'vikings',
 };
@@ -55,8 +58,7 @@ function cleanName(name = '') {
 }
 
 function favoriteIdFor(name = '') {
-  const normalized = cleanName(name);
-  return FAVORITE_TEAM_IDS[normalized] || undefined;
+  return FAVORITE_TEAM_IDS[cleanName(name)] || undefined;
 }
 
 function teamFromCompetitor(competitor, leagueId) {
@@ -135,8 +137,6 @@ function mapEvent(event, leagueId) {
     isMajorEvent: Boolean(event?.league?.isTournament || event?.isPostseason || isCup),
     isElimination: Boolean(event?.isElimination),
     ...(isCup ? { competitionName: 'Carabao Cup' } : {}),
-    // Keep scores at both the normalized team level and the game level so
-    // every UI surface can render a score without knowing ESPN's payload shape.
     ...(homeScore !== undefined ? { homeScore } : {}),
     ...(awayScore !== undefined ? { awayScore } : {}),
     homeTeam: { ...homeTeam, ...(homeScore !== undefined ? { score: homeScore } : {}) },
@@ -172,7 +172,6 @@ function normalizeEvents(payload, leagueId) {
 export async function fetchEspnLeagueWindow(leagueId, startDate, days = 7) {
   const config = LEAGUE_CONFIG[leagueId];
   if (!config) throw new Error(`Unsupported ESPN league: ${leagueId}`);
-
   const endDate = addDays(startDate, days - 1);
   const url = `${ESPN_BASE}/${config.sport}/${config.league}/scoreboard?dates=${dateKey(startDate)}-${dateKey(endDate)}`;
   const payload = await fetchJson(url);
@@ -182,7 +181,6 @@ export async function fetchEspnLeagueWindow(leagueId, startDate, days = 7) {
 export async function fetchEspnTeamWindow(teamId, startDate, days = 7) {
   const favorite = FAVORITE_TEAMS[teamId];
   if (!favorite) throw new Error(`Unsupported favorite team: ${teamId}`);
-
   const endDate = addDays(startDate, days - 1);
   const url = `${ESPN_BASE}/${favorite.sport}/${favorite.league}/teams/${favorite.externalId}/schedule?dates=${dateKey(startDate)}-${dateKey(endDate)}`;
   const payload = await fetchJson(url);
