@@ -1,5 +1,5 @@
 import { THESPORTSDB_LEAGUES } from '../src/sports/adapters/thesportsdb.js';
-import { fetchEspnLeagueWindow } from '../src/sports/adapters/espn-schedules.js';
+import { favoriteTeamIds, fetchEspnLeagueWindow, fetchEspnTeamWindow } from '../src/sports/adapters/espn-schedules.js';
 import { enrichGamesWithEspnStandings } from '../src/sports/adapters/espn-standings.js';
 import { applyDomesticSoccerRaceContext } from '../src/sports/adapters/soccer-context.js';
 
@@ -96,7 +96,7 @@ export default async function handler(req, res) {
 
   const games = [];
   const sources = [];
-  const diagnostics = { standings: [] };
+  const diagnostics = { standings: [], favorites: [] };
 
   const scheduleResults = await Promise.allSettled(
     ESPN_SCHEDULE_LEAGUES.map(async (leagueId) => [leagueId, await fetchEspnLeagueWindow(leagueId, today, days)]),
@@ -111,6 +111,25 @@ export default async function handler(req, res) {
       sources.push(sourceRecord(leagueId, sourceName(leagueId), 'ESPN public scoreboard', 'ok', normalized.length));
     } else {
       sources.push(sourceRecord(leagueId, sourceName(leagueId), 'ESPN public scoreboard', 'error', 0, errorMessage(result.reason)));
+    }
+  });
+
+  // Always query the six favorite teams directly as a second schedule path.
+  // This catches cross-competition games (UCL/cups) that may not be returned
+  // by a domestic league scoreboard, while deduplication below keeps one game.
+  const favoriteResults = await Promise.allSettled(
+    favoriteTeamIds().map(async (teamId) => [teamId, await fetchEspnTeamWindow(teamId, today, days)]),
+  );
+
+  favoriteResults.forEach((result, index) => {
+    const teamId = favoriteTeamIds()[index];
+    if (result.status === 'fulfilled') {
+      const [, teamGames] = result.value;
+      const normalized = teamGames.filter((game) => inWindow(game, startKey, endKey));
+      games.push(...normalized);
+      diagnostics.favorites.push(sourceRecord(teamId, teamId, 'ESPN favorite-team schedule', 'ok', normalized.length));
+    } else {
+      diagnostics.favorites.push(sourceRecord(teamId, teamId, 'ESPN favorite-team schedule', 'error', 0, errorMessage(result.reason)));
     }
   });
 
