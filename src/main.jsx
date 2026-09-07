@@ -24,7 +24,8 @@ function formatFreshness(date, loading) {
   if (ageSeconds < 10) return 'Updated just now';
   if (ageSeconds < 60) return `Updated ${ageSeconds}s ago`;
   const minutes = Math.floor(ageSeconds / 60);
-  return `Updated ${minutes}m ago`;
+  if (ageSeconds < 120) return `Updated ${minutes}m ago`;
+  return `Data delayed · ${minutes}m ago`;
 }
 
 function localDateKey(date) {
@@ -63,6 +64,34 @@ function mergeSelectedGame(current, liveGames) {
     homeTeam: { ...current.homeTeam, ...update.homeTeam },
     awayTeam: { ...current.awayTeam, ...update.awayTeam },
   };
+}
+
+function getLiveRefreshDelay(games, now = Date.now()) {
+  const todayKey = localDateKey(now);
+  const todayGames = games.filter((game) => localDateKey(game.startTime) === todayKey);
+  if (!todayGames.length) return null;
+
+  const liveGames = todayGames.filter((game) => game.status === 'live');
+  if (liveGames.length) {
+    const lateLive = liveGames.some((game) => {
+      const seconds = Number(game.clockSeconds);
+      return Number.isFinite(seconds) && seconds <= 120;
+    });
+    return lateLive ? 15_000 : LIVE_REFRESH_MS;
+  }
+
+  const upcoming = todayGames
+    .filter((game) => game.status !== 'final')
+    .map((game) => new Date(game.startTime).getTime() - now)
+    .filter((delta) => Number.isFinite(delta) && delta > 0)
+    .sort((a, b) => a - b);
+
+  if (!upcoming.length) return null;
+  const nextStart = upcoming[0];
+  if (nextStart <= 5 * 60_000) return 15_000;
+  if (nextStart <= 30 * 60_000) return 30_000;
+  if (nextStart <= 2 * 60 * 60_000) return IDLE_LIVE_REFRESH_MS;
+  return CALENDAR_REFRESH_MS;
 }
 
 function App() {
@@ -138,14 +167,34 @@ function App() {
 
   useEffect(() => {
     if (!todayLeagueQuery) return undefined;
+
+    let cancelled = false;
+    let timer;
+
+    const scheduleNextLiveRefresh = () => {
+      if (cancelled) return;
+      const delay = getLiveRefreshDelay(games);
+      if (delay == null) return;
+      timer = window.setTimeout(async () => {
+        setFreshnessNow(Date.now());
+        await loadLiveGames();
+        scheduleNextLiveRefresh();
+      }, delay);
+    };
+
     void loadLiveGames();
-    const refreshMs = hasLiveGames ? LIVE_REFRESH_MS : IDLE_LIVE_REFRESH_MS;
-    const timer = window.setInterval(() => {
-      setFreshnessNow(Date.now());
-      void loadLiveGames();
-    }, refreshMs);
+    scheduleNextLiveRefresh();
+
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [todayLeagueQuery, games]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setFreshnessNow(Date.now()), 10_000);
     return () => window.clearInterval(timer);
-  }, [todayLeagueQuery, hasLiveGames]);
+  }, []);
 
   const filteredGames = useMemo(() => games
     .filter((game) => activeLeagues.includes(game.leagueId))
@@ -190,7 +239,7 @@ function App() {
 
       <footer>
         <span>{loading ? 'Loading sports data…' : `${filteredMyGames.length} games in your 7-day view`}</span>
-        <span className="data-freshness" title={hasLiveGames ? 'Live scoreboards refresh automatically every 30 seconds; the full calendar refreshes every 5 minutes' : 'Live scoreboards refresh automatically every 60 seconds when today has games; the full calendar refreshes every 5 minutes'}>{freshnessLabel}</span>
+        <span className="data-freshness" title={hasLiveGames ? 'Live games refresh every 15 seconds late in the game and every 30 seconds otherwise; upcoming games increase refresh frequency near start time. The full calendar refreshes every 5 minutes.' : 'Upcoming games refresh more often as their start time approaches; the full calendar refreshes every 5 minutes.'}>{freshnessLabel}</span>
       </footer>
 
       <FilterSheet
