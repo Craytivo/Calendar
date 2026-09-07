@@ -11,14 +11,12 @@ function leagueColor(leagueId) {
   return league?.color || '#64748b';
 }
 
-function formatSelectedDate(dateKey) {
-  const date = new Date(`${dateKey}T12:00:00`);
-  return date.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+function formatDateKey(dateKey, options = {}) {
+  return new Date(`${dateKey}T12:00:00`).toLocaleDateString('en-US', options);
+}
+
+function getDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 export function CalendarView({ games, cursor, onShiftMonth }) {
@@ -26,8 +24,15 @@ export function CalendarView({ games, cursor, onShiftMonth }) {
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
   const firstDay = new Date(year, month, 1).getDay();
-  const days = new Date(year, month + 1, 0).getDate();
-  const cells = Array.from({ length: Math.ceil((firstDay + days) / 7) * 7 }, (_, i) => i - firstDay + 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const weeks = Math.ceil((firstDay + daysInMonth) / 7);
+  const startDate = new Date(year, month, 1 - firstDay);
+  const visibleDays = Array.from({ length: weeks * 7 }, (_, index) => {
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + index);
+    return date;
+  });
 
   const gamesByDate = useMemo(() => {
     const grouped = new Map();
@@ -45,49 +50,49 @@ export function CalendarView({ games, cursor, onShiftMonth }) {
     <section className="calendar-view">
       <div className="calendar-heading">
         <div>
-          <span className="eyebrow">Full schedule</span>
+          <span className="eyebrow">7-day schedule</span>
           <h2>{monthNames[month]} {year}</h2>
         </div>
         <div className="month-controls">
-          <button className="icon-button" onClick={() => onShiftMonth(-1)} aria-label="Previous month"><ChevronLeft size={18} /></button>
-          <button className="icon-button" onClick={() => onShiftMonth(1)} aria-label="Next month"><ChevronRight size={18} /></button>
+          <button className="icon-button" onClick={() => onShiftMonth(-1)} aria-label="Previous week"><ChevronLeft size={18} /></button>
+          <button className="icon-button" onClick={() => onShiftMonth(1)} aria-label="Next week"><ChevronRight size={18} /></button>
         </div>
       </div>
 
       <div className="calendar-card">
-        <div className="week-row">{weekDays.map((day) => <div key={day}>{day}</div>)}</div>
-        <div className="calendar-grid">
-          {cells.map((day, index) => {
-            const dateKey = day > 0 && day <= days ? `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : null;
-            const dayGames = dateKey ? (gamesByDate.get(dateKey) || []) : [];
+        <div className="week-row">
+          {weekDays.map((day) => <div key={day}>{day}</div>)}
+        </div>
+        <div className="calendar-grid seven-day-grid">
+          {visibleDays.map((date) => {
+            const dateKey = getDateKey(date);
+            const dayGames = gamesByDate.get(dateKey) || [];
+            const inMonth = date.getMonth() === month;
             const hasLive = dayGames.some((game) => game.status === 'live');
 
             return (
               <button
                 type="button"
-                className={`day-cell ${!dateKey ? 'muted' : ''} ${hasLive ? 'has-live' : ''}`}
-                key={index}
-                disabled={!dateKey}
-                onClick={() => dateKey && setSelectedDateKey(dateKey)}
-                aria-label={dateKey ? `${formatSelectedDate(dateKey)}, ${dayGames.length} game${dayGames.length === 1 ? '' : 's'}` : undefined}
+                className={`day-cell ${!inMonth ? 'muted' : ''} ${hasLive ? 'has-live' : ''}`}
+                key={dateKey}
+                onClick={() => setSelectedDateKey(dateKey)}
+                aria-label={`${formatDateKey(dateKey, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}, ${dayGames.length} game${dayGames.length === 1 ? '' : 's'}`}
               >
-                {dateKey && (
-                  <>
-                    <span className="day-number">{day}</span>
-                    {dayGames.length > 0 && (
-                      <div className="game-dots" aria-hidden="true">
-                        {dayGames.slice(0, 8).map((game) => (
-                          <span
-                            className={`game-dot ${game.status === 'live' ? 'live' : ''}`}
-                            key={game.id}
-                            style={{ '--dot-color': leagueColor(game.leagueId) }}
-                          />
-                        ))}
-                        {dayGames.length > 8 && <span className="game-dot-more">+{dayGames.length - 8}</span>}
-                      </div>
-                    )}
-                    {dayGames.length > 0 && <span className="day-game-count">{dayGames.length} {dayGames.length === 1 ? 'game' : 'games'}</span>}
-                  </>
+                <span className="day-number">{date.getDate()}</span>
+                {dayGames.length > 0 && (
+                  <div className="game-dots" aria-hidden="true">
+                    {dayGames.slice(0, 8).map((game) => (
+                      <span
+                        className={`game-dot ${game.status === 'live' ? 'live' : ''}`}
+                        key={game.id}
+                        style={{ '--dot-color': leagueColor(game.leagueId) }}
+                      />
+                    ))}
+                    {dayGames.length > 8 && <span className="game-dot-more">+{dayGames.length - 8}</span>}
+                  </div>
+                )}
+                {dayGames.length > 0 && (
+                  <span className="day-game-count">{dayGames.length} {dayGames.length === 1 ? 'game' : 'games'}</span>
                 )}
               </button>
             );
@@ -95,7 +100,7 @@ export function CalendarView({ games, cursor, onShiftMonth }) {
         </div>
       </div>
 
-      <p className="calendar-note">Select a date to view its games and details.</p>
+      <p className="calendar-note">Select any date to view its games and details.</p>
 
       {selectedDateKey && (
         <div className="calendar-modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setSelectedDateKey(null)}>
@@ -103,7 +108,7 @@ export function CalendarView({ games, cursor, onShiftMonth }) {
             <div className="calendar-modal-header">
               <div>
                 <span className="eyebrow">Game schedule</span>
-                <h3 id="calendar-modal-title">{formatSelectedDate(selectedDateKey)}</h3>
+                <h3 id="calendar-modal-title">{formatDateKey(selectedDateKey, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h3>
                 <span className="calendar-modal-count">{selectedGames.length} {selectedGames.length === 1 ? 'game' : 'games'}</span>
               </div>
               <button className="icon-button" onClick={() => setSelectedDateKey(null)} aria-label="Close date details"><X size={18} /></button>
