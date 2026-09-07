@@ -8,6 +8,7 @@ const logos = {
   tottenham: 'https://a.espncdn.com/i/teamlogos/soccer/500/367.png',
   'blue-jays': 'https://a.espncdn.com/i/teamlogos/mlb/500/14.png',
   oilers: 'https://a.espncdn.com/i/teamlogos/nhl/500/25.png',
+  vikings: 'https://a.espncdn.com/i/teamlogos/nfl/500/min.png',
 };
 
 const outputDir = path.resolve('public/team-logos');
