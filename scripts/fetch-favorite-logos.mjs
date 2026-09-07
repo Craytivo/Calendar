@@ -9,7 +9,11 @@ const leagueSources = {
 
 const favoriteLogos = {
   'sac-kings': { league: 'nba', externalId: '23' },
+  'oregon-ducks': { url: 'https://a.espncdn.com/i/teamlogos/ncaa/500/2483.png' },
+  'real-madrid': { url: 'https://a.espncdn.com/i/teamlogos/soccer/500/86.png' },
+  tottenham: { url: 'https://a.espncdn.com/i/teamlogos/soccer/500/367.png' },
   'blue-jays': { league: 'mlb', externalId: '14' },
+  oilers: { url: 'https://a.espncdn.com/i/teamlogos/nhl/500/25.png' },
   vikings: { league: 'nfl', externalId: '16' },
 };
 
@@ -35,6 +39,7 @@ async function saveLogo(url, outputPath) {
 
 const failures = [];
 
+// Download every NFL, NBA, and MLB team logo for broad My Games coverage.
 for (const [leagueId, source] of Object.entries(leagueSources)) {
   try {
     const payload = await fetchJson(`${ESPN_BASE}/${source.sport}/${source.league}/teams?limit=100`);
@@ -57,22 +62,28 @@ for (const [leagueId, source] of Object.entries(leagueSources)) {
   }
 }
 
-// Keep canonical favorite-team assets under their stable app IDs too.
+// Favorite teams outside NFL/NBA/MLB must also remain local canonical assets.
 for (const [teamId, favorite] of Object.entries(favoriteLogos)) {
-  const source = leagueSources[favorite.league];
   try {
-    const payload = await fetchJson(`${ESPN_BASE}/${source.sport}/${source.league}/teams/${favorite.externalId}`);
-    const team = payload?.team;
-    const logoUrl = team?.logos?.[0]?.href || team?.logo;
+    let logoUrl = favorite.url;
+
+    if (!logoUrl) {
+      const source = leagueSources[favorite.league];
+      const payload = await fetchJson(`${ESPN_BASE}/${source.sport}/${source.league}/teams/${favorite.externalId}`);
+      const team = payload?.team;
+      logoUrl = team?.logos?.[0]?.href || team?.logo;
+    }
+
     if (!logoUrl) throw new Error('no logo returned');
     await saveLogo(logoUrl, path.join(outputDir, `${teamId}.png`));
+    console.log(`Saved local favorite logo: ${teamId}`);
   } catch (error) {
     failures.push(`${teamId}: ${error.message}`);
   }
 }
 
 if (failures.length) {
-  console.error('Local league logo download failed. Refusing to build without complete NFL/NBA/MLB logo coverage.');
+  console.error('Local logo download failed. Refusing to build with missing required logo assets.');
   for (const failure of failures) console.error(` - ${failure}`);
   process.exit(1);
 }
