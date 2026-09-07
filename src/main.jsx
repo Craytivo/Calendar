@@ -22,6 +22,7 @@ function App() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [dataHealth, setDataHealth] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
 
   const loadGames = async () => {
@@ -32,6 +33,7 @@ function App() {
       if (!response.ok) throw new Error('Sports data unavailable');
       const payload = await response.json();
       setGames(payload.games ?? []);
+      setDataHealth(payload.health ?? null);
       setLastUpdated(payload.fetchedAt ?? new Date().toISOString());
     } catch (err) {
       setError(err.message || 'Unable to load sports data');
@@ -52,6 +54,8 @@ function App() {
   const toggleLeague = (id) => setActiveLeagues((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]);
   const shiftWeek = (delta) => setCursor((current) => new Date(current.getFullYear(), current.getMonth(), current.getDate() + (delta * 7)));
 
+  const nflUnavailable = dataHealth?.nfl?.status === 'error';
+
   return (
     <main className="app-shell">
       <AppHeader loading={loading} onRefresh={loadGames} />
@@ -68,6 +72,9 @@ function App() {
       <ViewSwitcher view={view} onChange={setView} onFilter={() => setFilterOpen(true)} />
 
       {error && <div className="data-notice">{error}. Refresh to try again.</div>}
+      {!error && nflUnavailable && (
+        <div className="data-notice">NFL data is temporarily unavailable. Other sports may still be current. Refresh to retry NFL data.</div>
+      )}
 
       {view === 'my-games' ? (
         <MyGamesView games={filteredMyGames} now={today} />
