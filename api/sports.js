@@ -102,14 +102,51 @@ function applySoccerStandings(games, tablesByLeague) {
   });
 }
 
+async function handleLiveRequest(req, res, timeZone, today, requestStarted) {
+  const requestedLeagues = String(req.query?.leagues || '').split(',').map((id) => id.trim()).filter((id) => ESPN_SCHEDULE_LEAGUES.includes(id));
+  const leagues = Array.from(new Set(requestedLeagues));
+  const startKey = dateKey(today);
+  const games = [];
+  const sources = [];
+  const diagnostics = { timezone: timeZone, mode: 'live', requestedLeagues: leagues, timings: { totalMs: 0, scheduleMs: 0 }, cache: { inflightDeduped: 0, staleRefreshes: 0, circuitOpen: 0 } };
+
+  if (leagues.length) {
+    const scheduleStarted = Date.now();
+    const results = await Promise.allSettled(leagues.map(async (leagueId) => [leagueId, await cached(`live:${leagueId}:${startKey}`, LIVE_CACHE_SECONDS, () => fetchEspnLeagueWindow(leagueId, today, 1))]));
+    diagnostics.timings.scheduleMs = Date.now() - scheduleStarted;
+    results.forEach((result, index) => {
+      const leagueId = leagues[index];
+      if (result.status === 'fulfilled') {
+        const [, cacheResult] = result.value;
+        const normalized = cacheResult.value.filter((game) => String(game.startTime).slice(0, 10) === startKey);
+        games.push(...normalized);
+        sources.push(sourceRecord(leagueId, sourceName(leagueId), 'ESPN public live scoreboard', 'ok', normalized.length, cacheResult.error ?? null, cacheResult.durationMs, cacheResult.cached, { stale: cacheResult.stale, refreshing: cacheResult.refreshing, circuitOpen: cacheResult.circuitOpen }));
+        if (cacheResult.refreshing) diagnostics.cache.staleRefreshes += 1;
+        if (cacheResult.circuitOpen) diagnostics.cache.circuitOpen += 1;
+      } else sources.push(sourceRecord(leagueId, sourceName(leagueId), 'ESPN public live scoreboard', 'error', 0, errorMessage(result.reason)));
+    });
+  }
+
+  const uniqueGames = Array.from(new Map(games.map((game) => [game.id, game])).values()).sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+  const hasLiveGames = uniqueGames.some((game) => game.status === 'live');
+  diagnostics.timings.totalMs = Date.now() - requestStarted;
+  const failedSources = sources.filter((source) => source.status === 'error');
+  const health = { status: failedSources.length === leagues.length && leagues.length > 0 ? 'degraded' : 'ok', failedSources: failedSources.map((source) => source.id) };
+  res.setHeader('Cache-Control', `s-maxage=${LIVE_CACHE_SECONDS}, stale-while-revalidate=${LIVE_CACHE_SECONDS}`);
+  return res.status(200).json({ source: 'free-sports-live', mode: 'live', startDate: startKey, fetchedAt: new Date().toISOString(), games: uniqueGames, sources, diagnostics, health, hasLiveGames });
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  const requestedDays = Number(req.query?.days ?? WINDOW_DAYS);
-  const days = Number.isFinite(requestedDays) ? Math.min(Math.max(Math.floor(requestedDays), 1), WINDOW_DAYS) : WINDOW_DAYS;
   const timeZone = String(req.query?.timezone || 'UTC');
   const today = todayInTimeZone(timeZone);
+  const requestStarted = Date.now();
+  if (String(req.query?.mode || '').toLowerCase() === 'live') return handleLiveRequest(req, res, timeZone, today, requestStarted);
+
+  const requestedDays = Number(req.query?.days ?? WINDOW_DAYS);
+  const days = Number.isFinite(requestedDays) ? Math.min(Math.max(Math.floor(requestedDays), 1), WINDOW_DAYS) : WINDOW_DAYS;
   const end = addDays(today, days);
-  const startKey = dateKey(today), endKey = dateKey(end), requestStarted = Date.now();
+  const startKey = dateKey(today), endKey = dateKey(end);
   const games = [], sources = [];
   const diagnostics = { timezone: timeZone, standings: [], favorites: [], timings: { totalMs: 0, scheduleMs: 0, standingsMs: 0, favoriteFallbackMs: 0 }, cache: { inflightDeduped: 0, staleRefreshes: 0, circuitOpen: 0 } };
 
