@@ -24,6 +24,7 @@ const FAVORITE_TEAMS = {
   tottenham: { name: 'Tottenham Hotspur', sport: 'soccer', league: 'eng.1', externalId: '367' },
   'blue-jays': { name: 'Toronto Blue Jays', sport: 'baseball', league: 'mlb', externalId: '14' },
   oilers: { name: 'Edmonton Oilers', sport: 'hockey', league: 'nhl', externalId: '25' },
+  vikings: { name: 'Minnesota Vikings', sport: 'football', league: 'nfl', externalId: '16' },
 };
 
 const FAVORITE_TEAM_IDS = {
@@ -35,6 +36,7 @@ const FAVORITE_TEAM_IDS = {
   'Tottenham Hotspur': 'tottenham',
   'Toronto Blue Jays': 'blue-jays',
   'Edmonton Oilers': 'oilers',
+  'Minnesota Vikings': 'vikings',
 };
 
 function addDays(date, days) {
@@ -82,6 +84,7 @@ function eventTypeFor(event) {
   const typeText = [event?.type?.text, event?.type?.name, event?.status?.type?.name, seasonType].join(' ').toLowerCase();
   if (typeText.includes('championship') || typeText.includes('final')) return 'championship';
   if (typeText.includes('playoff') || typeText.includes('postseason') || typeText.includes('knockout')) return 'playoff';
+  if (typeText.includes('preseason')) return 'preseason';
   if (competition?.type?.abbreviation === 'STD') return 'regular-season';
   return 'regular-season';
 }
