@@ -18,6 +18,8 @@ function formatTime(startTime) {
 function statusLabel(game) {
   if (game.status === 'live') return 'LIVE';
   if (game.status === 'final') return 'FINAL';
+  if (game.status === 'postponed') return 'POSTPONED';
+  if (game.status === 'cancelled') return 'CANCELLED';
   return formatTime(game.startTime);
 }
 
@@ -29,6 +31,13 @@ function teamLabel(team, leagueId) {
   return `${ranking}${name}`;
 }
 
+function scoreFor(game, side) {
+  const topLevel = side === 'away' ? game.awayScore : game.homeScore;
+  if (topLevel != null) return topLevel;
+  const teamScore = side === 'away' ? game.awayTeam?.score : game.homeTeam?.score;
+  return teamScore != null ? teamScore : null;
+}
+
 export function GameCard({ game, compact = false }) {
   const league = leagues.find((item) => item.id === game.leagueId);
   const tier = getPriorityTier(game);
@@ -37,6 +46,8 @@ export function GameCard({ game, compact = false }) {
   const isLive = game.status === 'live';
   const away = game.awayTeam || { name: 'TBD' };
   const home = game.homeTeam || { name: 'TBD' };
+  const awayScore = scoreFor(game, 'away');
+  const homeScore = scoreFor(game, 'home');
 
   return (
     <button className={`game-card ${compact ? 'compact' : ''} ${isFeatured ? 'featured' : ''} ${isFinal ? 'final' : ''} ${isLive ? 'live' : ''} ${leagueAccents[game.leagueId] || 'accent-neutral'}`}>
@@ -49,12 +60,12 @@ export function GameCard({ game, compact = false }) {
         <div className="team-row">
           <TeamMark team={away} size={isFeatured ? 'large' : 'medium'} />
           <span>{teamLabel(away, game.leagueId)}</span>
-          {game.awayScore != null && <strong>{game.awayScore}</strong>}
+          {awayScore != null && <strong>{awayScore}</strong>}
         </div>
         <div className="team-row">
           <TeamMark team={home} size={isFeatured ? 'large' : 'medium'} />
           <span>{teamLabel(home, game.leagueId)}</span>
-          {game.homeScore != null && <strong>{game.homeScore}</strong>}
+          {homeScore != null && <strong>{homeScore}</strong>}
         </div>
       </div>
       {!compact && (
