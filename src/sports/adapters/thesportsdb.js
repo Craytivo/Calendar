@@ -14,16 +14,9 @@ export const THESPORTSDB_LEAGUES = [
 ];
 
 const FAVORITE_TEAM_ALIASES = {
-  'sacramento kings': 'sac-kings',
-  'oregon': 'oregon-ducks',
-  'oregon ducks': 'oregon-ducks',
-  'real madrid': 'real-madrid',
-  'tottenham hotspur': 'tottenham',
-  'tottenham': 'tottenham',
-  'toronto blue jays': 'blue-jays',
-  'toronto': 'blue-jays',
-  'edmonton oilers': 'oilers',
-  'edmonton': 'oilers',
+  'sacramento kings': 'sac-kings', 'oregon': 'oregon-ducks', 'oregon ducks': 'oregon-ducks',
+  'real madrid': 'real-madrid', 'tottenham hotspur': 'tottenham', 'tottenham': 'tottenham',
+  'toronto blue jays': 'blue-jays', 'toronto': 'blue-jays', 'edmonton oilers': 'oilers', 'edmonton': 'oilers',
 };
 
 function teamId(name, providerId, leagueId) {
@@ -33,15 +26,28 @@ function teamId(name, providerId, leagueId) {
 
 function inferEventType(raw, leagueId, uclStage) {
   if (leagueId === 'ufc') return 'main-card';
-
   const text = `${raw.strEvent ?? ''} ${raw.strEventAlternate ?? ''} ${raw.strStatus ?? ''} ${raw.strPostponed ?? ''}`.toLowerCase();
   const round = String(raw.intRound ?? raw.strRound ?? '').toLowerCase();
-
   if (text.includes('championship') || text.includes('final') || uclStage === 'final') return 'championship';
   if (text.includes('playoff') || round.includes('playoff')) return 'playoff';
   if (uclStage && isUclKnockoutStage(uclStage)) return 'knockout';
   if (text.includes('knockout') || round.includes('quarter') || round.includes('semi')) return 'knockout';
   return 'regular-season';
+}
+
+function cleanUrl(value) {
+  const url = String(value ?? '').trim();
+  return /^https?:\/\//i.test(url) ? url : undefined;
+}
+
+function providerTeam(rawName, providerId, leagueId, raw = {}) {
+  return {
+    id: teamId(rawName, providerId, leagueId),
+    name: rawName,
+    leagueId,
+    ...(cleanUrl(raw.strTeamBadge || raw.strTeamLogo || raw.strBadge) ? { logoUrl: cleanUrl(raw.strTeamBadge || raw.strTeamLogo || raw.strBadge) } : {}),
+    ...(raw.strColour1 ? { primaryColor: String(raw.strColour1).trim() } : {}),
+  };
 }
 
 function toProviderGame(raw, league) {
@@ -52,38 +58,25 @@ function toProviderGame(raw, league) {
   const eventType = inferEventType(raw, league.id, uclStage);
   const knockout = league.id === 'ucl' && isUclKnockoutStage(uclStage);
   const leg = league.id === 'ucl' && knockout ? inferUclLeg(raw) : undefined;
+  const homeTeam = providerTeam(homeName, raw.idHomeTeam, league.id, { strTeamBadge: raw.strHomeTeamBadge, strTeamLogo: raw.strHomeTeamLogo, strBadge: raw.strHomeTeamBadge, strColour1: raw.strHomeTeamColor });
+  const awayTeam = providerTeam(awayName, raw.idAwayTeam, league.id, { strTeamBadge: raw.strAwayTeamBadge, strTeamLogo: raw.strAwayTeamLogo, strBadge: raw.strAwayTeamBadge, strColour1: raw.strAwayTeamColor });
 
   return {
-    id: `tsdb:${raw.idEvent}`,
-    leagueId: league.id,
-    homeTeamId: teamId(homeName, raw.idHomeTeam, league.id),
-    awayTeamId: teamId(awayName, raw.idAwayTeam, league.id),
-    startTime,
-    venue: raw.strVenue,
+    id: `tsdb:${raw.idEvent}`, leagueId: league.id,
+    homeTeamId: homeTeam.id, awayTeamId: awayTeam.id, startTime, venue: raw.strVenue,
     status: raw.strStatus === 'FT' || raw.strStatus === 'AET' || raw.strStatus === 'PEN' ? 'final' : 'scheduled',
-    eventType,
-    round: raw.intRound ?? raw.strRound,
-    competitionId: league.id,
+    eventType, round: raw.intRound ?? raw.strRound, competitionId: league.id,
     competitionPhase: uclStage === 'league-phase' ? 'league-phase' : uclStage === 'qualifying' ? 'qualifying' : knockout ? 'knockout' : undefined,
-    uclStage,
-    isTwoLegTie: knockout,
+    uclStage, isTwoLegTie: knockout,
     ...(leg !== undefined ? { leg, isFirstLeg: leg === 1, isSecondLeg: leg === 2 } : {}),
-    isElimination: knockout,
-    isMajorEvent: eventType === 'championship' || eventType === 'final',
-    homeTeam: { id: teamId(homeName, raw.idHomeTeam, league.id), name: homeName, leagueId: league.id },
-    awayTeam: { id: teamId(awayName, raw.idAwayTeam, league.id), name: awayName, leagueId: league.id },
+    isElimination: knockout, isMajorEvent: eventType === 'championship' || eventType === 'final', homeTeam, awayTeam,
   };
 }
 
 export function normalizeTheSportsDbEvents(events, league) {
-  const filtered = league.id === 'ufc'
-    ? events.filter((event) => /^ufc\b/i.test(String(event.strEvent ?? '').trim()))
-    : events;
-
+  const filtered = league.id === 'ufc' ? events.filter((event) => /^ufc\b/i.test(String(event.strEvent ?? '').trim())) : events;
   const normalized = normalizeGames(filtered.map((event) => toProviderGame(event, league)));
   return league.id === 'ucl' ? applyUclTieContext(normalized) : normalized;
 }
 
-export function getTheSportsDbLeague(id) {
-  return THESPORTSDB_LEAGUES.find((league) => league.id === id);
-}
+export function getTheSportsDbLeague(id) { return THESPORTSDB_LEAGUES.find((league) => league.id === id); }
