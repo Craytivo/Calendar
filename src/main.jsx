@@ -13,7 +13,8 @@ import './styles.css';
 import './styles-polish.css';
 
 const viewerTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-const LIVE_REFRESH_MS = 20_000;
+const LIVE_REFRESH_MS = 30_000;
+const IDLE_REFRESH_MS = 60_000;
 
 function formatFreshness(date, loading) {
   if (loading && !date) return 'Updating data…';
@@ -61,13 +62,15 @@ function App() {
 
   useEffect(() => { loadGames(); }, []);
 
+  const hasLiveGames = games.some((game) => game.status === 'live');
   useEffect(() => {
+    const refreshMs = hasLiveGames ? LIVE_REFRESH_MS : IDLE_REFRESH_MS;
     const timer = window.setInterval(() => {
       setFreshnessNow(Date.now());
       void loadGames({ silent: true });
-    }, LIVE_REFRESH_MS);
+    }, refreshMs);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [hasLiveGames]);
 
   const filteredGames = useMemo(() => games
     .filter((game) => activeLeagues.includes(game.leagueId))
@@ -112,7 +115,7 @@ function App() {
 
       <footer>
         <span>{loading ? 'Loading sports data…' : `${filteredMyGames.length} games in your 7-day view`}</span>
-        <span className="data-freshness" title="Live games refresh automatically every 20 seconds">{freshnessLabel}</span>
+        <span className="data-freshness" title={hasLiveGames ? 'Live games refresh automatically every 30 seconds' : 'Sports data refreshes automatically every 60 seconds'}>{freshnessLabel}</span>
       </footer>
 
       <FilterSheet
