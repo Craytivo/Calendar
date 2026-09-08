@@ -61,6 +61,29 @@ const finalWithPeak = getGameScore(finalGame, { peakScore: 124 });
 assert.equal(finalWithPeak, 100, 'persisted peak score must respect the 100-point cap');
 assert.equal(getGameScore(finalGame, { peakScore: 100 }), 100, 'a persisted peak of 100 should remain 100');
 
+const marketGame = (leagueId, market, extra = {}) => game({
+  leagueId,
+  homeTeamId: `${leagueId}-home`,
+  awayTeamId: `${leagueId}-away`,
+  homeTeam: { name: 'Home' },
+  awayTeam: { name: 'Away' },
+  odds: market,
+  ...extra,
+});
+
+const nflClose = marketGame('nfl', { spread: -1.5, total: 51.5 });
+const nflMismatch = marketGame('nfl', { spread: -10.5, total: 39.5 });
+const nbaClose = marketGame('nba', { spread: -1.5, total: 235.5 });
+const nhlClose = marketGame('nhl', { homeMoneyline: -110, awayMoneyline: -110, total: 6.5 });
+const mlbClose = marketGame('mlb', { homeMoneyline: -105, awayMoneyline: -105, total: 9.5 });
+const eplClose = marketGame('epl', { homeMoneyline: 150, drawMoneyline: 250, awayMoneyline: 150, total: 3.5 });
+
+assert.ok(getGameScore(nflClose) > getGameScore(nflMismatch), 'NFL market profile should reward tighter, higher-scoring matchups');
+assert.ok(getGameScoreComponents(nbaClose).marketExcitement > 0, 'NBA should expose a market contribution');
+assert.ok(getGameScoreComponents(nhlClose).marketCompetitiveness >= 90, 'balanced NHL moneylines should produce high competitiveness');
+assert.ok(getGameScoreComponents(mlbClose).marketScoringEnvironment > 50, 'higher MLB total should produce a positive scoring-environment signal');
+assert.ok(getGameScoreComponents(eplClose).marketExcitement > 0, 'soccer three-way moneyline should produce a market signal');
+
 const components = getGameScoreComponents(nonFavoriteSoccer);
 assert.ok(components.liveDrama > components.baseInterest, 'live drama should dominate base interest in a thriller');
 
