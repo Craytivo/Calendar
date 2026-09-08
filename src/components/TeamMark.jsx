@@ -21,7 +21,7 @@ const localNameLogoPaths = {
   'Washington State': '/team-logos/washington-state-cougars.png', 'Washington State Cougars': '/team-logos/washington-state-cougars.png',
 };
 
-const leagueLogoPaths = new Set(['nfl', 'nba', 'mlb', 'epl', 'laliga']);
+const leagueLogoDirectories = { nfl: 'nfl', nba: 'nba', mlb: 'mlb', epl: 'epl', laliga: 'laliga', 'eng.1': 'epl', 'esp.1': 'laliga' };
 
 const collegeAbbreviations = {
   'Alabama Crimson Tide': 'ALA', 'Arkansas Razorbacks': 'ARK', 'Auburn Tigers': 'AUB', 'Clemson Tigers': 'CLEM', 'Florida Gators': 'FLA', 'Florida State Seminoles': 'FSU',
@@ -57,7 +57,8 @@ function getLocalLogoPath(team) {
   if (favoriteLogoPaths[team?.id]) return favoriteLogoPaths[team.id];
   const name = normalizedName(team?.name);
   if (localNameLogoPaths[name]) return localNameLogoPaths[name];
-  if (leagueLogoPaths.has(team?.leagueId) && team?.id) return `/team-logos/${team.leagueId}/${team.id}.png`;
+  const directory = leagueLogoDirectories[team?.leagueId];
+  if (directory && team?.id) return `/team-logos/${directory}/${team.id}.png`;
   return null;
 }
 
