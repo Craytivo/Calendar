@@ -26,6 +26,22 @@ export const teams = [
     favoriteTier: 'must-see',
   },
   {
+    id: 'kansas-state-wildcats',
+    name: 'Kansas State',
+    abbreviation: 'KSU',
+    leagueId: 'ncaa-football',
+    favorite: true,
+    favoriteTier: 'favorite',
+  },
+  {
+    id: 'washington-state-cougars',
+    name: 'Washington State',
+    abbreviation: 'WSU',
+    leagueId: 'ncaa-football',
+    favorite: true,
+    favoriteTier: 'favorite',
+  },
+  {
     id: 'real-madrid',
     name: 'Real Madrid',
     abbreviation: 'RMA',
