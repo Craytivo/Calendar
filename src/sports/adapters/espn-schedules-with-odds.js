@@ -26,13 +26,16 @@ async function enrich(games) {
 
   for (let i = 0; i < missing.length; i += concurrency) {
     const batch = missing.slice(i, i + concurrency);
-    const results = await Promise.all(batch.map((game) => fetchEspnEventOdds({
-      ...CONFIG[game.leagueId],
-      eventId: eventId(game),
-      competitionId: game.competitionId,
-      homeTeamId: game.homeTeamId,
-      awayTeamId: game.awayTeamId,
-    })));
+    const results = await Promise.all(batch.map((game) => {
+      const id = eventId(game);
+      return fetchEspnEventOdds({
+        ...CONFIG[game.leagueId],
+        eventId: id,
+        competitionId: game.competitionId || id,
+        homeTeamId: game.homeTeamId,
+        awayTeamId: game.awayTeamId,
+      });
+    }));
     batch.forEach((game, index) => {
       if (results[index]) output.set(game.id, { ...game, odds: results[index] });
     });
