@@ -18,11 +18,10 @@ function teamLabel(team, leagueId) { const name = getDisplayTeamName(team); cons
 function scoreFor(game, side) { const topLevel = side === 'away' ? game.awayScore : game.homeScore; if (topLevel != null) return topLevel; const teamScore = side === 'away' ? game.awayTeam?.score : game.homeTeam?.score; return teamScore != null ? teamScore : null; }
 function readPeakScore(gameId) { if (typeof window === 'undefined' || !gameId) return 0; try { const values = JSON.parse(window.localStorage.getItem(PEAK_SCORE_STORAGE_KEY) || '{}'); return Number(values[gameId]) || 0; } catch { return 0; } }
 function writePeakScore(gameId, score) { if (typeof window === 'undefined' || !gameId || !Number.isFinite(score)) return; try { const values = JSON.parse(window.localStorage.getItem(PEAK_SCORE_STORAGE_KEY) || '{}'); if (score <= (Number(values[gameId]) || 0)) return; values[gameId] = score; window.localStorage.setItem(PEAK_SCORE_STORAGE_KEY, JSON.stringify(values)); } catch { /* Non-critical persistence. */ } }
-function getInsight(game, priorityReasons, liveSignal, gameScore) { if (game.status === 'live' && liveSignal?.reason) return [liveSignal.label || 'Live game', liveSignal.reason]; if (gameScore >= 110) return ['Epic game', 'High drama or major stakes']; if (priorityReasons.length >= 2) return priorityReasons.slice(0, 2); if (priorityReasons.length === 1) return [priorityReasons[0], null]; if (game.isMajorEvent) return ['Major event', null]; return [null, null]; }
+function getInsight(game, priorityReasons, liveSignal, gameScore) { if (liveSignal?.reason) return [liveSignal.label || 'Live game', liveSignal.reason]; if (gameScore >= 90) return ['High-value game', 'High drama or major stakes']; if (priorityReasons.length >= 2) return priorityReasons.slice(0, 2); if (priorityReasons.length === 1) return [priorityReasons[0], null]; if (game.isMajorEvent) return ['Major event', null]; return [null, null]; }
 
 export function GameCard({ game, compact = false, onOpen }) {
   const league = leagues.find((item) => item.id === game.leagueId);
-  const tier = getPriorityTier(game);
   const priorityScore = getPriorityScore(game);
   const currentGameScore = getGameScore(game);
   const [peakScore, setPeakScore] = useState(() => readPeakScore(game.id));
@@ -50,14 +49,11 @@ export function GameCard({ game, compact = false, onOpen }) {
   }, [game.id, currentGameScore, peakScore]);
 
   return (
-    <button type="button" className={`game-card ${compact ? 'compact' : ''} ${isLive ? 'live' : ''} ${isFinal ? 'final' : ''} ${isStartingSoon ? 'starting-soon' : ''} ${isFavorite ? 'favorite-team-card' : ''} accent-${game.leagueId === 'nba' || game.leagueId === 'epl' || game.leagueId === 'ucl' ? 'blue' : game.leagueId === 'mlb' || game.leagueId === 'ncaa-football' ? 'green' : game.leagueId === 'nhl' || game.leagueId === 'laliga' ? 'red' : 'neutral'}`} onClick={() => onOpen?.(game)} aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}`} data-priority-score={priorityScore} data-game-score={gameScore}>
+    <button type="button" className={`game-card ${compact ? 'compact' : ''} ${isLive ? 'live' : ''} ${isFinal ? 'final' : ''} ${isStartingSoon ? 'starting-soon' : ''} ${isFavorite ? 'favorite-team-card' : ''} score-${gameScoreLevel.toLowerCase()} accent-${game.leagueId === 'nba' || game.leagueId === 'epl' || game.leagueId === 'ucl' ? 'blue' : game.leagueId === 'mlb' || game.leagueId === 'ncaa-football' ? 'green' : game.leagueId === 'nhl' || game.leagueId === 'laliga' ? 'red' : 'neutral'}`} onClick={() => onOpen?.(game)} aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}, Game Score ${gameScore}`} data-priority-score={priorityScore} data-game-score={gameScore}>
       <header className="game-card-header">
         <span className="game-card-league">{league?.shortName || game.leagueId.toUpperCase()}</span>
         <div className="game-card-header-meta">
-          <span className="game-card-signal" title={`Game Score: ${gameScore} · ${gameScoreLevel}`} aria-label={`Game Score ${gameScore}`}>
-            <strong style={{ fontFamily: 'Manrope', fontSize: compact ? 16 : 20, lineHeight: 1, fontWeight: 850, letterSpacing: '-0.06em', color: 'var(--text)' }}>{gameScore}</strong>
-            <small style={{ fontSize: compact ? 6 : 7, fontWeight: 850, letterSpacing: '.1em', textTransform: 'uppercase' }}>GAME SCORE</small>
-          </span>
+          <span className="game-card-score" title={`Game Score ${gameScore} · ${gameScoreLevel}`} aria-label={`Game Score ${gameScore}, ${gameScoreLevel}`}><strong>{gameScore}</strong><small>Score</small></span>
           {isStartingSoon && !isLive && <Clock3 size={12} aria-hidden="true" />}
           {isLive && <span className="game-card-live-dot" aria-hidden="true" />}
           <span className="game-card-time">{statusLabel(game, isStartingSoon)}</span>
@@ -69,7 +65,7 @@ export function GameCard({ game, compact = false, onOpen }) {
         <div className="game-card-vs" aria-hidden="true">{hasScore ? (meta || (isLive ? 'LIVE' : 'FINAL')) : 'at'}</div>
         <div className={`game-card-team ${isFinal && awayScore != null && homeScore != null && homeScore > awayScore ? 'winner' : ''}`}><TeamMark team={home} size={compact ? 'medium' : 'large'} /><span>{teamLabel(home, game.leagueId)}</span>{hasScore && <strong>{homeScore ?? '—'}</strong>}</div>
       </div>
-      {!compact && (primaryInsight || secondaryInsight) && <footer className="game-card-insight"><span>Why it matters</span><div>{primaryInsight && <strong>{primaryInsight}</strong>}{secondaryInsight && <small>{secondaryInsight}</small>}</div></footer>}
+      {!compact && (primaryInsight || secondaryInsight) && <footer className="game-card-insight"><span>WHY IT MATTERS</span><div>{primaryInsight && <strong>{primaryInsight}</strong>}{secondaryInsight && <small>{secondaryInsight}</small>}</div></footer>}
     </button>
   );
 }
