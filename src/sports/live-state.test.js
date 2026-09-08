@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { getGameStateRefreshDelay, isGameBreak, mergeGameUpdate } from './live-state.js';
+import { getGameStateRefreshDelay, isGameBreak, mergeGameUpdate, mergeLiveGames } from './live-state.js';
 
 const now = Date.parse('2026-09-07T18:00:00Z');
 const base = { id: 'game-1', leagueId: 'nba', startTime: '2026-09-07T18:00:00Z', status: 'scheduled', homeTeam: { name: 'A' }, awayTeam: { name: 'B' } };
@@ -22,6 +22,17 @@ const laterFinal = mergeGameUpdate(
   { ...base, status: 'final', homeScore: 3, awayScore: 2, fetchedAt: '2026-09-07T18:07:00Z' },
 );
 assert.equal(laterFinal.status, 'final');
+
+const missingUpdate = mergeGameUpdate(base, undefined);
+assert.equal(missingUpdate, base);
+
+const mergedWithoutUpdate = mergeLiveGames(
+  [base, { ...base, id: 'game-2', status: 'scheduled', homeTeam: { name: 'C' }, awayTeam: { name: 'D' } }],
+  [{ ...base, status: 'live', homeScore: 1, awayScore: 0 }],
+);
+assert.equal(mergedWithoutUpdate.length, 2);
+assert.equal(mergedWithoutUpdate[0].status, 'live');
+assert.equal(mergedWithoutUpdate[1].id, 'game-2');
 
 const halftime = { ...base, status: 'live', period: 2, clockSeconds: 0, statusDetail: 'Halftime' };
 assert.equal(isGameBreak(halftime), true);
