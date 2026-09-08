@@ -2,8 +2,10 @@ import React from 'react';
 import { getMyGamesSections } from '../sports/selectors.js';
 import { GameCard } from './GameCard.jsx';
 import { TodayBrief } from './TodayBrief.jsx';
+import { NextUp } from './NextUp.jsx';
 import './MyGamesView.css';
 import './TodayBrief.css';
+import './NextUp.css';
 
 function Section({ eyebrow, title, games, emptyMessage, onOpenGame }) {
   return (
@@ -28,6 +30,7 @@ export function MyGamesView({ games, now, onOpenGame }) {
       <div className="signal-status"><span className="signal-status-dot" />Signal active</div>
     </header>
     <TodayBrief games={games} now={now} onOpenGame={onOpenGame} />
+    <NextUp games={games} now={now} onOpenGame={onOpenGame} />
     <div className="my-games-sections">
       <Section eyebrow="Today" title="Today's Games" games={today} onOpenGame={onOpenGame} emptyMessage="Nothing else from your category scope is scheduled today." />
       <Section eyebrow="Next 6 Days" title="Next 6 Days" games={upcoming} onOpenGame={onOpenGame} emptyMessage="No games from your category scope in the next six days." />
