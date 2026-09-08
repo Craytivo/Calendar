@@ -1,0 +1,277 @@
+/* Contrast foundation. Components should use semantic foreground tokens rather than
+   hard-coded light/dark text colors. Theme changes happen here so new surfaces
+   inherit a readable foreground without one-off fixes. */
+:root {
+  --foreground-primary: #172033;
+  --foreground-secondary: #4f5d70;
+  --foreground-tertiary: #66758a;
+  --foreground-inverse: #ffffff;
+  --surface-page: #f7f8fa;
+  --surface-base: #ffffff;
+  --surface-raised: #f1f3f6;
+  --surface-subtle: #f8fafc;
+  --surface-dark: #121821;
+  --border-strong: #d2d9e2;
+}
+
+html, body, #root { color: var(--foreground-primary); }
+
+/* Primary typography always follows the current surface foreground. */
+h1, h2, h3, h4, h5, h6,
+.page-intro h1,
+.calendar-heading h2,
+.day-heading h2,
+.my-games-section-heading h2,
+.today-brief-heading h2,
+.next-up-header h2,
+.next-up-reason h3,
+.sheet-header h2,
+.calendar-modal-header h3,
+.game-detail-score-team-name,
+.game-detail-team-name,
+.game-detail-storyline strong,
+.game-detail-info-row strong {
+  color: var(--foreground-primary);
+}
+
+p, .game-meta, .my-games-intro p, .today-brief-heading p, .next-up-reason p {
+  color: var(--foreground-secondary);
+}
+
+.eyebrow, .day-kicker, .section-count, .calendar-note, .day-count,
+.league-label, .game-card-status, .game-detail-eyebrow, .game-detail-status,
+.game-detail-team-abbr, .game-detail-team-state, .game-detail-vs,
+.game-detail-storyline > div > span, .game-detail-storyline small,
+.game-detail-info-label, .game-detail-live-note, .scoreboard-team-copy small,
+.scoreboard-divider span, .scoreboard-divider small, .scoreboard-team-copy small,
+.next-up-label, .next-up-countdown {
+  color: var(--foreground-tertiary);
+}
+
+button, input, select, textarea { color: var(--foreground-primary); }
+
+/* Light surfaces */
+.today-brief,
+.next-up,
+.today-brief-card .game-card,
+.next-up-card .game-card,
+.game-card,
+.scoreboard-card,
+.game-detail-modal,
+.game-detail-hero,
+.game-detail-scoreboard,
+.game-detail-matchup,
+.game-detail-watchline,
+.game-detail-storyline,
+.calendar-card,
+.calendar-modal,
+.calendar-modal-header,
+.filter-sheet,
+.segmented-control,
+.filter-button,
+.icon-button,
+.brand-mark {
+  color: var(--foreground-primary);
+}
+
+.today-brief,
+.next-up { background: var(--surface-base); }
+.today-brief-card .game-card,
+.next-up-card .game-card,
+.game-card,
+.scoreboard-card,
+.game-detail-scoreboard,
+.game-detail-matchup,
+.calendar-card,
+.calendar-modal-header,
+.filter-sheet,
+.segmented-control,
+.filter-button,
+.icon-button,
+.brand-mark { background-color: var(--surface-base); }
+
+.today-brief-heading h2,
+.next-up-header h2,
+.next-up-reason h3 { color: var(--foreground-primary); }
+.today-brief-heading p,
+.next-up-reason p { color: var(--foreground-secondary); }
+.today-brief-stats,
+.today-brief-footer,
+.next-up-countdown { color: var(--foreground-tertiary); }
+.today-brief-stats strong,
+.today-brief-footer span:last-child,
+.next-up-reason button { color: var(--foreground-primary); }
+.next-up-reason { background: var(--surface-subtle); color: var(--foreground-primary); }
+.next-up-reason button { background: var(--surface-base); }
+
+/* Dark surfaces: the default foreground is deliberately bright. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-primary: #f7f9fc;
+    --foreground-secondary: #c1cbd7;
+    --foreground-tertiary: #9eabba;
+    --foreground-inverse: #0b0f14;
+    --surface-page: #0b0f14;
+    --surface-base: #121821;
+    --surface-raised: #1a2230;
+    --surface-subtle: #1a222e;
+    --surface-dark: #0f151d;
+    --border-strong: #3a4656;
+  }
+
+  html, body, #root { color: var(--foreground-primary); background: var(--surface-page); }
+
+  /* Any content placed on a dark surface gets a light foreground by default. */
+  .today-brief,
+  .next-up,
+  .today-brief-card,
+  .next-up-card,
+  .next-up-reason,
+  .game-card,
+  .scoreboard-card,
+  .my-games-intro,
+  .my-games-summary,
+  .live-center,
+  .live-center .game-card,
+  .calendar-card,
+  .calendar-modal,
+  .calendar-modal-header,
+  .calendar-modal-games,
+  .game-detail-modal,
+  .game-detail-hero,
+  .game-detail-scoreboard,
+  .game-detail-matchup,
+  .game-detail-watchline,
+  .game-detail-storyline,
+  .filter-sheet,
+  .segmented-control,
+  .filter-button,
+  .icon-button,
+  .mobile-nav,
+  .data-notice,
+  .section-empty,
+  .empty-state {
+    color: var(--foreground-primary);
+  }
+
+  .today-brief h1, .today-brief h2, .today-brief h3,
+  .next-up h1, .next-up h2, .next-up h3,
+  .game-card h1, .game-card h2, .game-card h3,
+  .scoreboard-card h1, .scoreboard-card h2, .scoreboard-card h3,
+  .my-games-intro h1, .my-games-section-heading h2,
+  .live-center-header h2,
+  .calendar-heading h2, .calendar-modal-header h3,
+  .game-detail-modal h1, .game-detail-modal h2, .game-detail-modal h3,
+  .sheet-header h2,
+  .next-up-reason h3,
+  .today-brief-heading h2,
+  .next-up-header h2 {
+    color: var(--foreground-primary) !important;
+  }
+
+  .today-brief p,
+  .next-up p,
+  .game-card p,
+  .my-games-intro p,
+  .section-empty,
+  .empty-state p,
+  .data-notice,
+  .game-meta,
+  .today-brief-heading p,
+  .next-up-reason p,
+  .game-detail-live-note {
+    color: var(--foreground-secondary) !important;
+  }
+
+  .today-brief .day-kicker,
+  .today-brief-stats,
+  .today-brief-footer,
+  .next-up .day-kicker,
+  .next-up-countdown,
+  .next-up-label,
+  .section-count,
+  .game-card .league-label,
+  .game-card .game-card-status,
+  .game-card .game-meta,
+  .scoreboard-team-copy small,
+  .scoreboard-divider span,
+  .scoreboard-divider small,
+  .calendar-note,
+  .day-count,
+  .game-detail-eyebrow,
+  .game-detail-status,
+  .game-detail-team-abbr,
+  .game-detail-team-state,
+  .game-detail-vs,
+  .game-detail-storyline > div > span,
+  .game-detail-storyline small,
+  .game-detail-info-label {
+    color: var(--foreground-tertiary) !important;
+  }
+
+  .today-brief-stats strong,
+  .today-brief-footer span:last-child,
+  .next-up-reason button,
+  .next-up-reason button svg,
+  .signal-status,
+  .window-note,
+  .mobile-nav button.active,
+  .segmented-control button.active,
+  .filter-button:hover,
+  .icon-button:hover {
+    color: var(--foreground-primary) !important;
+  }
+
+  .next-up-reason { background: var(--surface-raised) !important; border-color: var(--border-strong) !important; }
+  .next-up-reason button { background: var(--surface-base) !important; border-color: var(--border-strong) !important; }
+  .today-brief-card .game-card,
+  .next-up-card .game-card { background: var(--surface-base) !important; }
+
+  .game-card,
+  .scoreboard-card,
+  .game-detail-scoreboard,
+  .game-detail-matchup,
+  .game-detail-watchline,
+  .game-detail-storyline,
+  .calendar-card,
+  .calendar-modal,
+  .calendar-modal-header,
+  .filter-sheet,
+  .segmented-control,
+  .filter-button,
+  .icon-button,
+  .brand-mark,
+  .data-notice,
+  .section-empty,
+  .empty-state {
+    background: var(--surface-base) !important;
+    border-color: var(--border-strong);
+  }
+
+  .calendar-modal-games { background: var(--surface-page) !important; }
+
+  .team-row span:not(.team-mark),
+  .team-row strong,
+  .scoreboard-team-copy span,
+  .scoreboard-team > strong,
+  .priority-indicator,
+  .game-detail-score-team-name,
+  .game-detail-team-name,
+  .game-detail-score,
+  .game-detail-countdown,
+  .game-detail-storyline strong,
+  .game-detail-info-row strong,
+  .game-detail-watchline strong {
+    color: var(--foreground-primary) !important;
+  }
+
+  .scoreboard-team-copy small,
+  .scoreboard-divider small,
+  .scoreboard-divider span,
+  .game-detail-team-abbr,
+  .game-detail-team-state,
+  .game-detail-vs { color: var(--foreground-tertiary) !important; }
+
+  .mobile-nav { background: color-mix(in srgb, var(--surface-base) 94%, transparent) !important; border-color: var(--border-strong); }
+  .mobile-nav button { color: var(--foreground-tertiary); }
+}
