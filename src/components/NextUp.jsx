@@ -1,6 +1,5 @@
 import React from 'react';
-import { getPriorityScore, getPriorityTier, getLeaguePriority } from '../sports/priority.js';
-import { getWatchScore } from '../sports/watchability.js';
+import { getGameScore } from '../sports/game-score.js';
 import { GameCard } from './GameCard.jsx';
 import './NextUp.css';
 
@@ -9,7 +8,7 @@ function isFutureScheduled(game, now) {
 }
 
 function score(game) {
-  return (getPriorityTier(game) * -1000) + getPriorityScore(game) * 10 + getWatchScore(game) - getLeaguePriority(game.leagueId) * 0.1;
+  return getGameScore(game);
 }
 
 export function getNextUpGame(games, now = new Date()) {
