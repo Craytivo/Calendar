@@ -81,7 +81,7 @@ function App() {
 
   const nflUnavailable = dataHealth?.nfl?.status === 'error';
   const freshnessLabel = useMemo(() => formatFreshness(lastUpdated, loading), [lastUpdated, loading, freshnessNow]);
-
+  
   return (
     <main className="app-shell">
       <AppHeader loading={loading} onRefresh={loadGames} />
