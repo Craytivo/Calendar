@@ -1,0 +1,95 @@
+/* Spacing system: restrained 4/8px rhythm with larger jumps only between hierarchy levels. */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 48px;
+  --content-gutter: 20px;
+}
+
+/* Page rhythm */
+.app-shell { padding-top: 20px; }
+.app-header { margin-bottom: var(--space-2); }
+.page-intro { padding: 56px 0 28px; }
+.page-intro p { margin-top: var(--space-3); }
+.view-toolbar { margin-top: var(--space-1); padding: var(--space-3) 0; }
+
+/* My Games: clear separation between intro, sections, and cards */
+.my-games-list { padding-top: var(--space-4); }
+.my-games-intro { padding: 4px 0 16px; }
+.my-games-intro h1 { margin-top: var(--space-1); }
+.my-games-intro p { margin-top: var(--space-2); }
+.my-games-section { padding: var(--space-7) 0 var(--space-2); }
+.my-games-section + .my-games-section { margin-top: var(--space-3); padding-top: var(--space-7); }
+.my-games-section-heading { margin-bottom: var(--space-3); }
+.my-games-cards { gap: var(--space-2); }
+.section-empty { padding: var(--space-6) var(--space-4); }
+
+/* Cards: compact internal rhythm without making content feel cramped */
+.game-card { gap: var(--space-3); padding: var(--space-4); }
+.game-card.featured { padding: var(--space-5); }
+.game-card-top { min-height: 20px; }
+.teams { gap: var(--space-2); }
+.team-row { gap: var(--space-3); }
+.game-meta { gap: var(--space-4); padding-top: var(--space-1); }
+
+/* Scoreboards: give the score the visual breathing room it needs */
+.scoreboard-body { row-gap: var(--space-3); }
+.scoreboard-divider { margin: 0 var(--space-1); }
+.live-signal { margin-top: var(--space-1); padding: var(--space-2) var(--space-3); }
+.live-reasons { gap: var(--space-1); margin-top: 0; }
+
+/* Calendar: predictable cell padding and section spacing */
+.calendar-view { padding-top: var(--space-7); }
+.calendar-heading { margin-bottom: var(--space-4); }
+.calendar-card { border-radius: 16px; }
+.week-row div { padding: var(--space-3); }
+.day-cell { min-height: 112px; padding: var(--space-3); }
+.game-dots { gap: var(--space-1); margin: var(--space-4) 2px 0; }
+.day-game-count { margin-top: var(--space-2); }
+.calendar-note { margin-top: var(--space-3); }
+
+/* Modal/sheet rhythm */
+.calendar-modal-header { padding: var(--space-6); }
+.calendar-modal-games { gap: var(--space-2); padding: var(--space-4); }
+.filter-sheet { padding: var(--space-6); }
+.sheet-header { padding-bottom: var(--space-6); }
+.sheet-section { padding: var(--space-6) 0; }
+
+/* Footer should feel attached to the page, not another content section. */
+footer { padding: var(--space-7) 2px var(--space-2); }
+
+@media (max-width: 760px) {
+  :root { --content-gutter: 16px; }
+  .app-shell { padding-top: 12px; }
+  .app-header { margin-bottom: 0; }
+  .page-intro { padding: var(--space-8) 0 var(--space-5); }
+  .view-toolbar { margin-top: 0; padding: var(--space-2) var(--content-gutter); }
+  .my-games-list { padding-top: var(--space-2); }
+  .my-games-intro { padding: var(--space-1) 0 var(--space-4); }
+  .my-games-section { padding: var(--space-6) 0 var(--space-1); }
+  .my-games-section + .my-games-section { margin-top: var(--space-2); padding-top: var(--space-6); }
+  .my-games-section-heading { margin-bottom: var(--space-2); }
+  .my-games-cards { gap: var(--space-2); }
+  .game-card { gap: var(--space-3); padding: var(--space-3); }
+  .game-card.featured { padding: var(--space-4); }
+  .team-row { gap: var(--space-3); }
+  .game-meta { gap: var(--space-3); }
+  .calendar-view { padding-top: var(--space-6); }
+  .calendar-heading { margin-bottom: var(--space-3); }
+  .week-row div { padding: var(--space-2) var(--space-1); }
+  .day-cell { min-height: 88px; padding: var(--space-2); }
+  .game-dots { margin-top: var(--space-3); }
+  .calendar-note { margin-top: var(--space-2); }
+  .calendar-modal-header { padding: var(--space-4); }
+  .calendar-modal-games { padding: var(--space-3); }
+  .filter-sheet { padding: var(--space-4); }
+  .sheet-header { padding-bottom: var(--space-5); }
+  .sheet-section { padding: var(--space-5) 0; }
+  footer { padding-top: var(--space-6); }
+}
