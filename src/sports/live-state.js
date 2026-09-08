@@ -78,6 +78,8 @@ export function statusRank(status) {
 
 export function mergeGameUpdate(current, update) {
   if (!current) return update;
+  if (!update) return current;
+
   const currentRank = statusRank(current.status);
   const updateRank = statusRank(update.status);
   if (updateRank < currentRank) return current;
