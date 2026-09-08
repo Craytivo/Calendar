@@ -8,7 +8,7 @@ const base = {
 };
 
 assert.equal(getLiveGameSignal(base).level, 'critical');
-assert.ok(getLiveGameReasons(base).includes('Final minutes'));
+assert.ok(getLiveGameReasons(base).includes('Late in the game'));
 assert.ok(getLiveGameReasons(base).includes('One-score game'));
 assert.equal(getLiveSignalRank(base), 0);
 assert.equal(getLiveGameSignal({ ...base, status: 'scheduled' }).level, 'scheduled');
