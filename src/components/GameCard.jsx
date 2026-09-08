@@ -41,7 +41,7 @@ export function GameCard({ game, compact = false, onOpen }) {
   const isLive = game.status === 'live';
   const isFinal = game.status === 'final';
   const isStartingSoon = game.status === 'scheduled' && minutesUntil(game.startTime) <= 60 && new Date(game.startTime).getTime() >= Date.now();
-  const isFavorite = favoriteTeamIds.has(game.homeTeamId) || favoriteTeamIds.has(game.awayTeamId) || Boolean(game.homeTeam?.favorite || game.awayTeam?.favorite);
+  const isFavorite = favoriteTeamIds.has(game.homeTeamId) || favoriteTeamIds.has(game.awayTeamId);
   const away = game.awayTeam || { name: 'TBD' };
   const home = game.homeTeam || { name: 'TBD' };
   const awayScore = scoreFor(game, 'away');
