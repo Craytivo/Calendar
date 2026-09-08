@@ -1,12 +1,14 @@
-import React from 'react';
-import { Clock3, Eye, Star } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Clock3, Star } from 'lucide-react';
 import { leagues } from '../sports/leagues.js';
 import { getPriorityScore, getPriorityTier, getPriorityReasons } from '../sports/priority.js';
-import { getWatchScore, getWatchLevel } from '../sports/watchability.js';
+import { getGameScore, getGameScoreLevel } from '../sports/game-score.js';
 import { getLiveGameSignal } from '../sports/game-intelligence.js';
 import { formatScoreboardMeta } from '../sports/clock.js';
 import { TeamMark, getDisplayTeamName } from './TeamMark.jsx';
 import './GameCard.css';
+
+const PEAK_SCORE_STORAGE_KEY = 'calendar:game-score-peaks:v1';
 
 function formatTime(startTime) {
   return new Date(startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -40,13 +42,35 @@ function scoreFor(game, side) {
   return teamScore != null ? teamScore : null;
 }
 
-function getInsight(game, priorityReasons, liveSignal) {
-  const reasons = priorityReasons.filter(Boolean);
+function readPeakScore(gameId) {
+  if (typeof window === 'undefined' || !gameId) return 0;
+  try {
+    const values = JSON.parse(window.localStorage.getItem(PEAK_SCORE_STORAGE_KEY) || '{}');
+    return Number(values[gameId]) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writePeakScore(gameId, score) {
+  if (typeof window === 'undefined' || !gameId || !Number.isFinite(score)) return;
+  try {
+    const values = JSON.parse(window.localStorage.getItem(PEAK_SCORE_STORAGE_KEY) || '{}');
+    if (score <= (Number(values[gameId]) || 0)) return;
+    values[gameId] = score;
+    window.localStorage.setItem(PEAK_SCORE_STORAGE_KEY, JSON.stringify(values));
+  } catch {
+    // Peak persistence is an enhancement; rendering must continue if storage is unavailable.
+  }
+}
+
+function getInsight(game, priorityReasons, liveSignal, gameScore) {
   if (game.status === 'live' && liveSignal?.reason) {
     return [liveSignal.label || 'Live game', liveSignal.reason];
   }
-  if (reasons.length >= 2) return reasons.slice(0, 2);
-  if (reasons.length === 1) return [reasons[0], null];
+  if (gameScore >= 110) return ['Epic game', 'High drama or major stakes'];
+  if (priorityReasons.length >= 2) return priorityReasons.slice(0, 2);
+  if (priorityReasons.length === 1) return [priorityReasons[0], null];
   if (game.isMajorEvent) return ['Major event', null];
   return [null, null];
 }
@@ -55,22 +79,30 @@ export function GameCard({ game, compact = false, onOpen }) {
   const league = leagues.find((item) => item.id === game.leagueId);
   const tier = getPriorityTier(game);
   const priorityScore = getPriorityScore(game);
-  const watchScore = getWatchScore(game);
-  const watchLevel = getWatchLevel(watchScore);
+  const currentGameScore = getGameScore(game);
+  const [peakScore, setPeakScore] = useState(() => readPeakScore(game.id));
+  const gameScore = getGameScore(game, { peakScore });
+  const gameScoreLevel = getGameScoreLevel(gameScore);
   const liveSignal = getLiveGameSignal(game);
   const priorityReasons = getPriorityReasons(game);
   const isLive = game.status === 'live';
   const isFinal = game.status === 'final';
   const isStartingSoon = game.status === 'scheduled' && minutesUntil(game.startTime) <= 60 && new Date(game.startTime).getTime() >= Date.now();
   const isFavorite = Boolean(game.homeTeam?.favorite || game.awayTeam?.favorite);
-  const showWatch = watchScore >= 35 || tier <= 3;
   const away = game.awayTeam || { name: 'TBD' };
   const home = game.homeTeam || { name: 'TBD' };
   const awayScore = scoreFor(game, 'away');
   const homeScore = scoreFor(game, 'home');
   const hasScore = (isLive || isFinal) && (awayScore != null || homeScore != null);
   const meta = formatScoreboardMeta(game);
-  const [primaryInsight, secondaryInsight] = getInsight(game, priorityReasons, liveSignal);
+  const [primaryInsight, secondaryInsight] = getInsight(game, priorityReasons, liveSignal, gameScore);
+
+  useEffect(() => {
+    if (!game.id || !Number.isFinite(currentGameScore)) return;
+    const nextPeak = Math.max(peakScore, currentGameScore);
+    if (nextPeak !== peakScore) setPeakScore(nextPeak);
+    writePeakScore(game.id, nextPeak);
+  }, [game.id, currentGameScore, peakScore]);
 
   return (
     <button
@@ -79,20 +111,18 @@ export function GameCard({ game, compact = false, onOpen }) {
       onClick={() => onOpen?.(game)}
       aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}`}
       data-priority-score={priorityScore}
-      data-watch-score={watchScore}
+      data-game-score={gameScore}
     >
       <header className="game-card-header">
         <span className="game-card-league">{league?.shortName || game.leagueId.toUpperCase()}</span>
         <div className="game-card-header-meta">
+          <span className="game-card-score" title={`Game Score: ${gameScore} · ${gameScoreLevel}`}>
+            <strong>{gameScore}</strong>
+            <small>GAME SCORE</small>
+          </span>
           {isStartingSoon && !isLive && <Clock3 size={12} aria-hidden="true" />}
           {isLive && <span className="game-card-live-dot" aria-hidden="true" />}
           <span className="game-card-time">{statusLabel(game, isStartingSoon)}</span>
-          {showWatch && (
-            <span className="game-card-signal" title={`${watchLevel.label} watchability`}>
-              <Eye size={12} aria-hidden="true" />
-              <strong>{watchScore}</strong>
-            </span>
-          )}
           {isFavorite && <Star size={13} fill="currentColor" className="game-card-favorite" aria-label="Favorite team" />}
         </div>
       </header>
