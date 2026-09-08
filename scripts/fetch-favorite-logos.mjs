@@ -12,6 +12,8 @@ const leagueSources = {
 const favoriteLogos = {
   'sac-kings': { league: 'nba', externalId: '23' },
   'oregon-ducks': { url: 'https://a.espncdn.com/i/teamlogos/ncaa/500/2483.png' },
+  'kansas-state-wildcats': { league: 'ncaa-football', externalId: '2306' },
+  'washington-state-cougars': { league: 'ncaa-football', externalId: '265' },
   'real-madrid': { url: 'https://a.espncdn.com/i/teamlogos/soccer/500/86.png' },
   tottenham: { url: 'https://a.espncdn.com/i/teamlogos/soccer/500/367.png' },
   'blue-jays': { league: 'mlb', externalId: '14' },
@@ -73,8 +75,6 @@ for (const [leagueId, source] of Object.entries(leagueSources)) {
       }
     }
   } catch (error) {
-    // If the local league assets already exist, an upstream outage should not
-    // make an otherwise healthy build fail.
     const leagueDir = path.join(outputDir, leagueId);
     if (!(await fileExists(leagueDir))) failures.push(`${leagueId}: ${error.message}`);
   }
