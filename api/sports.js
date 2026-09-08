@@ -1,5 +1,5 @@
 import { THESPORTSDB_LEAGUES } from '../src/sports/adapters/thesportsdb.js';
-import { favoriteTeamIds, fetchEspnLeagueWindow, fetchEspnTeamWindow } from '../src/sports/adapters/espn-schedules.js';
+import { favoriteTeamIds, fetchEspnLeagueWindow, fetchEspnTeamWindow } from '../src/sports/adapters/espn-schedules-with-odds.js';
 import { enrichGamesWithEspnStandings } from '../src/sports/adapters/espn-standings.js';
 import { applyDomesticSoccerRaceContext } from '../src/sports/adapters/soccer-context.js';
 
@@ -205,22 +205,18 @@ export default async function handler(req, res) {
   let enrichedGames = applyDomesticSoccerRaceContext(applySoccerStandings(games, tablesByLeague));
   if (enrichedGames.some((game) => STANDINGS_LEAGUES.has(game.leagueId))) {
     try {
-      const result = await enrichGamesWithEspnStandings(enrichedGames, today.getUTCFullYear());
-      enrichedGames = result;
-      diagnostics.standings.push(...(result.diagnostics ?? []).map((item) => sourceRecord(`espn-${item.leagueId}`, `${item.leagueId.toUpperCase()} standings`, item.provider, 'ok', item.count, null, item.durationMs, item.cached, { stale: item.stale, deduped: item.deduped, ageMs: item.ageMs })));
+      const result = await enrichGamesWithEspnStandings(enrichedGames);
+      enrichedGames = result.games;
+      diagnostics.standings.push(...result.diagnostics);
     } catch (error) {
-      diagnostics.standings.push(sourceRecord('espn-major-sports', 'Major sports standings', 'ESPN standings', 'error', 0, errorMessage(error)));
+      diagnostics.standings.push(sourceRecord('espn-standings', 'ESPN standings enrichment', 'ESPN', 'error', 0, errorMessage(error)));
     }
   }
-  diagnostics.timings.standingsMs = Date.now() - standingsStarted;
 
-  const uniqueGames = Array.from(new Map(enrichedGames.map((game) => [game.id, game])).values()).filter((game) => inWindow(game, startKey, endKey)).sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
-  const nflSource = sources.find((source) => source.id === 'nfl');
-  const scheduleErrors = sources.filter((source) => source.status === 'error');
-  const hasLiveGames = uniqueGames.some((game) => game.status === 'live');
+  const uniqueGames = Array.from(new Map(enrichedGames.map((game) => [game.id, game])).values()).sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
   diagnostics.timings.totalMs = Date.now() - requestStarted;
-  const health = { status: scheduleErrors.length === ESPN_SCHEDULE_LEAGUES.length ? 'degraded' : 'ok', nfl: nflSource ? { status: nflSource.status, count: nflSource.count, ...(nflSource.error ? { error: nflSource.error } : {}) } : { status: 'missing', count: 0 }, failedSources: scheduleErrors.map((source) => source.id) };
-  const cacheSeconds = hasLiveGames ? LIVE_CACHE_SECONDS : SCHEDULE_CACHE_SECONDS;
-  res.setHeader('Cache-Control', `s-maxage=${cacheSeconds}, stale-while-revalidate=${cacheSeconds}`);
-  return res.status(200).json({ source: 'free-sports-aggregation', windowDays: days, startDate: startKey, endDateExclusive: endKey, fetchedAt: new Date().toISOString(), games: uniqueGames, sources, diagnostics, health });
+  const failedSources = sources.filter((source) => source.status === 'error');
+  const health = { status: failedSources.length === sources.length && sources.length > 0 ? 'degraded' : 'ok', failedSources: failedSources.map((source) => source.id) };
+  res.setHeader('Cache-Control', `s-maxage=${SCHEDULE_CACHE_SECONDS}, stale-while-revalidate=${SCHEDULE_CACHE_SECONDS}`);
+  return res.status(200).json({ source: 'free-sports', mode: 'schedule', startDate: startKey, endDate: endKey, days, fetchedAt: new Date().toISOString(), games: uniqueGames, sources, diagnostics, health });
 }
