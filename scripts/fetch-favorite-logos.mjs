@@ -4,6 +4,7 @@ import path from 'node:path';
 const leagueSources = {
   nfl: { sport: 'football', league: 'nfl' },
   nba: { sport: 'basketball', league: 'nba' },
+  'ncaa-football': { sport: 'football', league: 'college-football' },
   mlb: { sport: 'baseball', league: 'mlb' },
   epl: { sport: 'soccer', league: 'eng.1' },
   laliga: { sport: 'soccer', league: 'esp.1' },
@@ -54,8 +55,6 @@ async function fileExists(filePath) {
 
 const failures = [];
 
-// Local league logo assets are persistent build inputs. Existing files are reused
-// so normal builds never redownload or rewrite the logo tree.
 for (const [leagueId, source] of Object.entries(leagueSources)) {
   try {
     const payload = await fetchJson(`${ESPN_BASE}/${source.sport}/${source.league}/teams?limit=100`);
