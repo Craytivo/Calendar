@@ -14,7 +14,6 @@ function Section({ eyebrow, title, games, emptyMessage, onOpenGame }) {
         </div>
         {games.length > 0 && <span className="section-count">{games.length} {games.length === 1 ? 'game' : 'games'}</span>}
       </div>
-
       {games.length > 0 ? (
         <div className="my-games-cards">
           {games.map((game) => <GameCard key={game.id} game={game} onOpen={onOpenGame} />)}
@@ -31,6 +30,7 @@ export function MyGamesView({ games, now, onOpenGame }) {
   const liveGames = today.filter((game) => game.status === 'live');
   const todayNonLive = today.filter((game) => game.status !== 'live');
   const hasGames = today.length > 0 || upcoming.length > 0;
+  const totalVisible = today.length + upcoming.length;
 
   if (!hasGames) {
     return (
@@ -46,12 +46,18 @@ export function MyGamesView({ games, now, onOpenGame }) {
     <div className="my-games-list">
       <header className="my-games-intro">
         <div className="my-games-title-block">
-          <span className="day-kicker">My Games</span>
+          <span className="day-kicker">My Games · Signal over noise</span>
           <h1>What matters today</h1>
-          <p>Live first. Then the strongest games from your category scope.</p>
+          <p>Live games take the lead. Your teams and the strongest matchups follow.</p>
         </div>
         <div className="signal-status"><span className="signal-status-dot" />Signal active</div>
       </header>
+
+      <div className="my-games-summary" aria-label="Today's game summary">
+        <div className="summary-item"><span className="summary-value">{liveGames.length}</span><span className="summary-label">Live now</span></div>
+        <div className="summary-item"><span className="summary-value">{todayNonLive.length}</span><span className="summary-label">Today</span></div>
+        <div className="summary-item"><span className="summary-value">{totalVisible}</span><span className="summary-label">In view</span></div>
+      </div>
 
       {liveGames.length > 0 && (
         <section className="live-center" aria-label="Live games">
@@ -76,7 +82,6 @@ export function MyGamesView({ games, now, onOpenGame }) {
           onOpenGame={onOpenGame}
           emptyMessage={liveGames.length > 0 ? 'Live games are above. Nothing else from your category scope is scheduled today.' : 'No games from your category scope today.'}
         />
-
         <Section
           eyebrow="Next 6 Days"
           title="Next 6 Days"
