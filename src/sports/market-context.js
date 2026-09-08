@@ -1,0 +1,164 @@
+const SPORT_PROFILES = {
+  nfl: { totalMean: 45, totalUnit: 4, spreadScale: 7, weights: { competitiveness: 0.6, scoring: 0.4 }, maxContribution: 16 },
+  nba: { totalMean: 228, totalUnit: 2.5, spreadScale: 9, weights: { competitiveness: 0.6, scoring: 0.4 }, maxContribution: 14 },
+  'ncaa-football': { totalMean: 52, totalUnit: 4, spreadScale: 14, weights: { competitiveness: 0.6, scoring: 0.4 }, maxContribution: 14 },
+  nhl: { totalMean: 6.2, totalUnit: 1.5, moneylineScale: 250, weights: { competitiveness: 0.65, scoring: 0.35 }, maxContribution: 12 },
+  mlb: { totalMean: 8.5, totalUnit: 1.5, moneylineScale: 220, weights: { competitiveness: 0.6, scoring: 0.4 }, maxContribution: 12 },
+  epl: { totalMean: 2.8, totalUnit: 0.8, moneylineScale: 220, weights: { competitiveness: 0.65, scoring: 0.35 }, maxContribution: 12 },
+  laliga: { totalMean: 2.8, totalUnit: 0.8, moneylineScale: 220, weights: { competitiveness: 0.65, scoring: 0.35 }, maxContribution: 12 },
+  ucl: { totalMean: 2.9, totalUnit: 0.8, moneylineScale: 220, weights: { competitiveness: 0.65, scoring: 0.35 }, maxContribution: 14 },
+  ufc: { moneylineScale: 300, weights: { competitiveness: 1 }, maxContribution: 10 },
+};
+
+function finite(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function firstFinite(...values) {
+  for (const value of values) {
+    const parsed = finite(value);
+    if (parsed !== undefined) return parsed;
+  }
+  return undefined;
+}
+
+function marketObject(game) {
+  return game?.odds ?? game?.bettingOdds ?? game?.market ?? {};
+}
+
+function getAmericanProbability(odds) {
+  const value = finite(odds);
+  if (value === undefined || value === 0) return undefined;
+  return value > 0 ? 100 / (value + 100) : -value / (-value + 100);
+}
+
+function getDecimalProbability(odds) {
+  const value = finite(odds);
+  return value !== undefined && value > 1 ? 1 / value : undefined;
+}
+
+function getProbability(odds, format) {
+  if (format === 'decimal') return getDecimalProbability(odds);
+  return getAmericanProbability(odds);
+}
+
+function normalizeTwoWayProbabilities(first, second, format) {
+  const a = getProbability(first, format);
+  const b = getProbability(second, format);
+  if (a === undefined || b === undefined) return undefined;
+  const total = a + b;
+  if (total <= 0) return undefined;
+  return [a / total, b / total];
+}
+
+function normalizeThreeWayProbabilities(home, draw, away, format) {
+  const values = [getProbability(home, format), getProbability(draw, format), getProbability(away, format)];
+  if (values.some((value) => value === undefined)) return undefined;
+  const total = values.reduce((sum, value) => sum + value, 0);
+  return values.map((value) => value / total);
+}
+
+function closenessFromProbabilities(probabilities) {
+  if (!probabilities?.length) return 0;
+  const strongest = Math.max(...probabilities);
+  // 50/50 in a two-way market = 100; an extreme favorite trends toward 0.
+  return Math.max(0, Math.min(100, Math.round(100 * (1 - ((strongest - (1 / probabilities.length)) / (1 - (1 / probabilities.length)))))));
+}
+
+function scoringScore(total, mean, unit) {
+  if (total === undefined) return 0;
+  return Math.max(0, Math.min(100, Math.round(50 + ((total - mean) / unit) * 10)));
+}
+
+function getCommonTotal(game) {
+  const market = marketObject(game);
+  return firstFinite(
+    market.total,
+    market.overUnder,
+    market.overUnderTotal,
+    game?.total,
+    game?.overUnder,
+    game?.overUnderTotal,
+  );
+}
+
+function getSpread(game) {
+  const market = marketObject(game);
+  return firstFinite(market.spread, market.pointSpread, market.homeSpread, game?.spread, game?.pointSpread, game?.homeSpread);
+}
+
+function getMoneyline(game) {
+  const market = marketObject(game);
+  const format = market.format ?? market.oddsFormat ?? game?.oddsFormat;
+  const home = firstFinite(market.homeMoneyline, market.homeMoneyLine, market.homeML, game?.homeMoneyline, game?.homeMoneyLine);
+  const away = firstFinite(market.awayMoneyline, market.awayMoneyLine, market.awayML, game?.awayMoneyline, game?.awayMoneyLine);
+  const draw = firstFinite(market.drawMoneyline, market.drawMoneyLine, market.drawML, game?.drawMoneyline, game?.drawMoneyLine);
+  return { home, away, draw, format };
+}
+
+function spreadProfile(game, profile) {
+  const spread = getSpread(game);
+  if (spread === undefined) return { available: false, score: 0 };
+  return { available: true, score: Math.max(0, Math.min(100, Math.round(100 * Math.exp(-Math.abs(spread) / profile.spreadScale)))) };
+}
+
+function moneylineProfile(game, profile) {
+  const { home, away, draw, format } = getMoneyline(game);
+  const probabilities = draw !== undefined
+    ? normalizeThreeWayProbabilities(home, draw, away, format)
+    : normalizeTwoWayProbabilities(home, away, format);
+  if (!probabilities) return { available: false, score: 0 };
+  return { available: true, score: closenessFromProbabilities(probabilities) };
+}
+
+function getProfileSignals(game, profile) {
+  const sport = game?.leagueId;
+  const spreadBased = sport === 'nfl' || sport === 'nba' || sport === 'ncaa-football';
+  const moneylineBased = sport === 'nhl' || sport === 'mlb' || sport === 'epl' || sport === 'laliga' || sport === 'ucl' || sport === 'ufc';
+  const balance = spreadBased ? spreadProfile(game, profile) : moneylineBased ? moneylineProfile(game, profile) : { available: false, score: 0 };
+  const total = sport === 'ufc' ? undefined : getCommonTotal(game);
+  const scoring = total === undefined ? { available: false, score: 0 } : { available: true, score: scoringScore(total, profile.totalMean, profile.totalUnit) };
+  return { balance, scoring };
+}
+
+export function getSportMarketContext(game) {
+  const profile = SPORT_PROFILES[game?.leagueId];
+  if (!profile) return { available: false, marketExcitementScore: 0, competitivenessScore: 0, scoringEnvironmentScore: 0, contribution: 0 };
+
+  const { balance, scoring } = getProfileSignals(game, profile);
+  const signals = [];
+  if (balance.available) signals.push(balance.score * profile.weights.competitiveness);
+  if (scoring.available) signals.push(scoring.score * profile.weights.scoring);
+  if (!signals.length) return { available: false, marketExcitementScore: 0, competitivenessScore: 0, scoringEnvironmentScore: 0, contribution: 0 };
+
+  const weightTotal = (balance.available ? profile.weights.competitiveness : 0) + (scoring.available ? profile.weights.scoring : 0);
+  const marketExcitementScore = Math.round(signals.reduce((sum, value) => sum + value, 0) / weightTotal);
+  const contribution = Math.round(marketExcitementScore * (profile.maxContribution / 100));
+
+  return {
+    available: true,
+    marketExcitementScore,
+    competitivenessScore: balance.available ? balance.score : 0,
+    scoringEnvironmentScore: scoring.available ? scoring.score : 0,
+    contribution,
+    maxContribution: profile.maxContribution,
+  };
+}
+
+export function getSportMarketScore(game) {
+  return getSportMarketContext(game).contribution;
+}
+
+export function getSportMarketReasons(game) {
+  const context = getSportMarketContext(game);
+  if (!context.available) return [];
+  const reasons = [];
+  if (context.competitivenessScore >= 80) reasons.push('Expected close matchup');
+  if (context.scoringEnvironmentScore >= 75) reasons.push('High scoring expectation');
+  return reasons;
+}
+
+export function getSupportedMarketLeagues() {
+  return Object.keys(SPORT_PROFILES);
+}
