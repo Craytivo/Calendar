@@ -14,6 +14,7 @@ import './styles.css';
 import './styles-polish.css';
 import './theme-contrast.css';
 import './spacing-refinement.css';
+import './dark-heading-contrast.css';
 
 const viewerTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 const CALENDAR_REFRESH_MS = 300_000;
