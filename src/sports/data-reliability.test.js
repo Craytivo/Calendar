@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { getDataReliability, isReliableGame, sanitizeGames } from './data-reliability.js';
+const now = new Date('2026-09-08T12:00:00Z');
+const base = { id:'1', leagueId:'nfl', startTime:'2026-09-09T18:00:00Z', status:'scheduled' };
+assert.equal(isReliableGame(base, now), true);
+assert.equal(isReliableGame({ ...base, startTime:'not-a-date' }, now), false);
+assert.equal(isReliableGame({ ...base, status:'unknown' }, now), false);
+assert.equal(isReliableGame({ ...base, id:null }, now), false);
+const games = sanitizeGames([{...base,fetchedAt:'2026-09-08T12:00:00Z'},{...base,fetchedAt:'2026-09-08T12:01:00Z'},{...base,id:'2',status:'live',fetchedAt:'2026-09-08T11:00:00Z'},{...base,id:'3',startTime:'2026-09-20T18:00:00Z'}], now);
+assert.equal(games.length, 2);
+assert.equal(games.find((game)=>game.id==='1').fetchedAt, '2026-09-08T12:01:00Z');
+assert.equal(getDataReliability([{...base},{...base}], now).duplicateCount, 1);
+console.log('data-reliability.test.js passed');
