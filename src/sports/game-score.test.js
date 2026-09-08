@@ -43,6 +43,11 @@ const mlbExtraInning = game({
   homeScore: 5, awayScore: 4, period: 11, isOvertime: true, clockMode: 'inning',
 });
 
+const finalGame = game({
+  leagueId: 'ucl', status: 'final', homeTeamId: 'aston-villa', awayTeamId: 'club-brugge',
+  homeTeam: { name: 'Aston Villa' }, awayTeam: { name: 'Club Brugge' }, homeScore: 3, awayScore: 2,
+});
+
 assert.ok(getGameScore(nonFavoriteMidgame) < 45, 'ordinary non-favorite close game away from the finish should stay below the meaningful-game range');
 assert.ok(getGameScore(nonFavoriteSoccer) > getGameScore(ordinaryFavorite), 'late tied UCL thriller should beat an ordinary favorite');
 assert.ok(getGameScore(nonFavoriteSoccer) >= 70, '3-3 UCL game in the 88th should be HOT or better');
@@ -52,9 +57,9 @@ assert.ok(getGameScore(nhlLate) >= 60, 'one-goal NHL game in final minute should
 assert.ok(getGameScore(mlbExtraInning) >= 60, 'one-run extra-inning MLB final should be GOOD or better');
 assert.ok(getGameScore(ordinaryFavorite) > 0, 'favorite relevance should contribute to scheduled games');
 
-const finalWithPeak = getGameScore(nonFavoriteSoccer, { peakScore: 124 });
-assert.ok(finalWithPeak <= 100, 'persisted peak score must respect the 100-point cap');
-assert.equal(getGameScore(nonFavoriteSoccer, { peakScore: 100 }), 100, 'a persisted peak of 100 should remain 100');
+const finalWithPeak = getGameScore(finalGame, { peakScore: 124 });
+assert.equal(finalWithPeak, 100, 'persisted peak score must respect the 100-point cap');
+assert.equal(getGameScore(finalGame, { peakScore: 100 }), 100, 'a persisted peak of 100 should remain 100');
 
 const components = getGameScoreComponents(nonFavoriteSoccer);
 assert.ok(components.liveDrama > components.baseInterest, 'live drama should dominate base interest in a thriller');
