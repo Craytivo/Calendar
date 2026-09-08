@@ -1,0 +1,8 @@
+// Logo storage is independent from favorite-team status.
+export const logoLibrary={
+  'sac-kings':'/team-logos/sac-kings.png','oregon-ducks':'/team-logos/oregon-ducks.png','kansas-state-wildcats':'/team-logos/kansas-state-wildcats.png','washington-state-cougars':'/team-logos/washington-state-cougars.png','real-madrid':'/team-logos/real-madrid.png',tottenham:'/team-logos/tottenham.png','blue-jays':'/team-logos/blue-jays.png',dodgers:'/team-logos/dodgers.png',oilers:'/team-logos/oilers.png',vikings:'/team-logos/vikings.png','inter-milan':'/team-logos/inter-milan.png'
+};
+export const logoLeagueDirectories={nfl:'nfl',nba:'nba','ncaa-football':'ncaa-football',mlb:'mlb',nhl:'nhl',epl:'epl',laliga:'laliga','ligue-1':'ligue-1','serie-a':'serie-a',ucl:'ucl'};
+export const logoNameAliases={'Inter Milan':'inter-milan',Internazionale:'inter-milan','Inter Milano':'inter-milan','Kansas State':'kansas-state-wildcats','Kansas State Wildcats':'kansas-state-wildcats','Washington State':'washington-state-cougars','Washington State Cougars':'washington-state-cougars'};
+export function getLocalLogoPath({canonicalId,leagueId,providerId,name}){if(canonicalId&&logoLibrary[canonicalId])return logoLibrary[canonicalId];const aliasId=logoNameAliases[String(name||'').trim()];if(aliasId&&logoLibrary[aliasId])return logoLibrary[aliasId];const directory=logoLeagueDirectories[leagueId];return directory&&providerId!=null&&String(providerId).trim()?`/team-logos/${directory}/${String(providerId).trim()}.png`:null;}
+export function getRemoteLogoUrl(team){return [team?.logo,team?.logoUrl,team?.logos?.[0]?.href].find((value)=>typeof value==='string'&&/^https?:\/\//i.test(value))||null;}
