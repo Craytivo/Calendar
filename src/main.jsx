@@ -16,6 +16,7 @@ import './theme-contrast.css';
 import './spacing-refinement.css';
 import './dark-heading-contrast.css';
 import './watch-score-refinement.css';
+import './premium-visual-system.css';
 
 const viewerTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 const CALENDAR_REFRESH_MS = 300_000;
@@ -32,12 +33,7 @@ function formatFreshness(date, loading) {
 }
 
 function localDateKey(date) {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: viewerTimeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(date));
+  return new Intl.DateTimeFormat('en-CA', { timeZone: viewerTimeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(date));
 }
 
 function mergeSelectedGame(current, liveGames) {
@@ -93,12 +89,9 @@ function App() {
   const todayLeagueIds = useMemo(() => {
     const todayKey = localDateKey(Date.now());
     const ids = new Set();
-    for (const game of games) {
-      if (localDateKey(game.startTime) === todayKey) ids.add(game.leagueId);
-    }
+    for (const game of games) if (localDateKey(game.startTime) === todayKey) ids.add(game.leagueId);
     return Array.from(ids).sort();
   }, [games]);
-
   const todayLeagueQuery = todayLeagueIds.join(',');
 
   const loadLiveGames = async ({ silent = true } = {}) => {
@@ -126,106 +119,51 @@ function App() {
   };
 
   useEffect(() => { void loadGames(); }, []);
-
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setFreshnessNow(Date.now());
-      void loadGames({ silent: true });
-    }, CALENDAR_REFRESH_MS);
+    const timer = window.setInterval(() => { setFreshnessNow(Date.now()); void loadGames({ silent: true }); }, CALENDAR_REFRESH_MS);
     return () => window.clearInterval(timer);
   }, []);
-
   useEffect(() => {
     if (!todayLeagueQuery) return undefined;
     let cancelled = false;
     let timer;
-
     const scheduleNextLiveRefresh = () => {
       if (cancelled) return;
       const delay = getGameStateRefreshDelay(gamesRef.current);
       if (delay == null) return;
-      timer = window.setTimeout(async () => {
-        setFreshnessNow(Date.now());
-        await loadLiveGames();
-        scheduleNextLiveRefresh();
-      }, delay);
+      timer = window.setTimeout(async () => { setFreshnessNow(Date.now()); await loadLiveGames(); scheduleNextLiveRefresh(); }, delay);
     };
-
     void loadLiveGames();
     scheduleNextLiveRefresh();
-
-    return () => {
-      cancelled = true;
-      if (timer) window.clearTimeout(timer);
-      liveAbortRef.current?.abort();
-    };
+    return () => { cancelled = true; if (timer) window.clearTimeout(timer); liveAbortRef.current?.abort(); };
   }, [todayLeagueQuery]);
-
   useEffect(() => {
     const timer = window.setInterval(() => setFreshnessNow(Date.now()), 10_000);
     return () => window.clearInterval(timer);
   }, []);
 
-  const filteredGames = useMemo(() => games
-    .filter((game) => activeLeagues.includes(game.leagueId))
-    .filter((game) => !favoritesOnly || favoriteTeamIds.has(game.homeTeamId) || favoriteTeamIds.has(game.awayTeamId)),
-  [games, activeLeagues, favoritesOnly]);
-
+  const filteredGames = useMemo(() => games.filter((game) => activeLeagues.includes(game.leagueId)).filter((game) => !favoritesOnly || favoriteTeamIds.has(game.homeTeamId) || favoriteTeamIds.has(game.awayTeamId)), [games, activeLeagues, favoritesOnly]);
   const filteredMyGames = useMemo(() => getMyGames(filteredGames, today), [filteredGames]);
-
   const toggleLeague = (id) => setActiveLeagues((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]);
   const shiftWeek = (delta) => setCursor((current) => new Date(current.getFullYear(), current.getMonth(), current.getDate() + (delta * 7)));
-
   const nflUnavailable = dataHealth?.nfl?.status === 'error';
   const freshnessLabel = useMemo(() => formatFreshness(lastUpdated, loading), [lastUpdated, loading, freshnessNow]);
-  
+
   return (
     <main className="app-shell">
       <AppHeader loading={loading} onRefresh={loadGames} />
-
       <section className="page-intro">
-        <div>
-          <span className="eyebrow">Personal sports calendar</span>
-          <h1>My Games</h1>
-          <p>Only the games worth your attention, organized around today and the next seven days.</p>
-        </div>
+        <div><span className="eyebrow">Personal sports calendar</span><h1>My Games</h1><p>Only the games worth your attention, organized around today and the next seven days.</p></div>
         <div className="window-note">7-day signal</div>
       </section>
-
       <ViewSwitcher view={view} onChange={setView} onFilter={() => setFilterOpen(true)} />
-
       {error && <div className="data-notice">{error}. Refresh to try again.</div>}
-      {!error && nflUnavailable && (
-        <div className="data-notice">NFL data is temporarily unavailable. Other sports may still be current. Refresh to retry NFL data.</div>
-      )}
-
-      {view === 'my-games' ? (
-        <MyGamesView games={filteredMyGames} now={today} onOpenGame={setSelectedGame} />
-      ) : (
-        <CalendarView games={filteredGames} cursor={cursor} onShiftWeek={shiftWeek} onOpenGame={setSelectedGame} />
-      )}
-
+      {!error && nflUnavailable && <div className="data-notice">NFL data is temporarily unavailable. Other sports may still be current. Refresh to retry NFL data.</div>}
+      {view === 'my-games' ? <MyGamesView games={filteredMyGames} now={today} onOpenGame={setSelectedGame} /> : <CalendarView games={filteredGames} cursor={cursor} onShiftWeek={shiftWeek} onOpenGame={setSelectedGame} />}
       <GameDetailModal game={selectedGame} onClose={() => setSelectedGame(null)} />
-
-      <footer>
-        <span>{loading ? 'Loading sports data…' : `${filteredMyGames.length} games in your 7-day view`}</span>
-        <span className="data-freshness" title="Live polling is sport-aware: active games refresh aggressively, late-game states refresh faster, and halftime/intermissions back off. Upcoming games refresh more often near start time. The full calendar refreshes every 5 minutes.">{freshnessLabel}</span>
-      </footer>
-
-      <FilterSheet
-        open={filterOpen}
-        leagues={leagues}
-        activeLeagues={activeLeagues}
-        onToggleLeague={toggleLeague}
-        favoritesOnly={favoritesOnly}
-        onFavoritesOnly={setFavoritesOnly}
-        onClose={() => setFilterOpen(false)}
-      />
-
-      <nav className="mobile-nav" aria-label="Primary navigation">
-        <button className={view === 'my-games' ? 'active' : ''} onClick={() => setView('my-games')}>My Games</button>
-        <button className={view === 'calendar' ? 'active' : ''} onClick={() => setView('calendar')}>Calendar</button>
-      </nav>
+      <footer><span>{loading ? 'Loading sports data…' : `${filteredMyGames.length} games in your 7-day view`}</span><span className="data-freshness" title="Live polling is sport-aware: active games refresh aggressively, late-game states refresh faster, and halftime/intermissions back off. Upcoming games refresh more often near start time. The full calendar refreshes every 5 minutes.">{freshnessLabel}</span></footer>
+      <FilterSheet open={filterOpen} leagues={leagues} activeLeagues={activeLeagues} onToggleLeague={toggleLeague} favoritesOnly={favoritesOnly} onFavoritesOnly={setFavoritesOnly} onClose={() => setFilterOpen(false)} />
+      <nav className="mobile-nav" aria-label="Primary navigation"><button className={view === 'my-games' ? 'active' : ''} onClick={() => setView('my-games')}>My Games</button><button className={view === 'calendar' ? 'active' : ''} onClick={() => setView('calendar')}>Calendar</button></nav>
     </main>
   );
 }
