@@ -3,9 +3,13 @@ import { getMyGamesSections } from '../sports/selectors.js';
 import { GameCard } from './GameCard.jsx';
 import { TodayBrief } from './TodayBrief.jsx';
 import { NextUp } from './NextUp.jsx';
+import { IntelligentDaySummary } from './IntelligentDaySummary.jsx';
+import { WeeklyRadar } from './WeeklyRadar.jsx';
 import './MyGamesView.css';
 import './TodayBrief.css';
 import './NextUp.css';
+import './IntelligentDaySummary.css';
+import './WeeklyRadar.css';
 
 function Section({ eyebrow, title, games, emptyMessage, onOpenGame }) {
   return (
@@ -31,9 +35,11 @@ export function MyGamesView({ games, now, onOpenGame }) {
     </header>
     <TodayBrief games={games} now={now} onOpenGame={onOpenGame} />
     <NextUp games={games} now={now} onOpenGame={onOpenGame} />
+    <IntelligentDaySummary games={games} date={now} onOpenGame={onOpenGame} />
     <div className="my-games-sections">
       <Section eyebrow="Today" title="Today's Games" games={today} onOpenGame={onOpenGame} emptyMessage="Nothing else from your category scope is scheduled today." />
       <Section eyebrow="Next 6 Days" title="Next 6 Days" games={upcoming} onOpenGame={onOpenGame} emptyMessage="No games from your category scope in the next six days." />
     </div>
+    <WeeklyRadar games={games} now={now} onOpenGame={onOpenGame} />
   </div>;
 }
