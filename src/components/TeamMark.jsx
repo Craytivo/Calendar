@@ -3,6 +3,8 @@ import React, { useEffect, useState } from 'react';
 const teamIdentity = {
   'sac-kings': { label: 'SAC', color: '#5A2D81' },
   'oregon-ducks': { label: 'ORE', color: '#0A7A3B' },
+  'kansas-state-wildcats': { label: 'KSU', color: '#512888' },
+  'washington-state-cougars': { label: 'WSU', color: '#981E32' },
   'real-madrid': { label: 'RMA', color: '#1F4E8C' },
   tottenham: { label: 'TOT', color: '#132257' },
   'blue-jays': { label: 'TOR', color: '#134A8E' },
@@ -15,6 +17,8 @@ const teamIdentity = {
 const favoriteLogoPaths = {
   'sac-kings': '/team-logos/sac-kings.png',
   'oregon-ducks': '/team-logos/oregon-ducks.png',
+  'kansas-state-wildcats': '/team-logos/kansas-state-wildcats.png',
+  'washington-state-cougars': '/team-logos/washington-state-cougars.png',
   'real-madrid': '/team-logos/real-madrid.png',
   tottenham: '/team-logos/tottenham.png',
   'blue-jays': '/team-logos/blue-jays.png',
@@ -28,6 +32,10 @@ const localNameLogoPaths = {
   'Inter Milan': '/team-logos/inter-milan.png',
   Internazionale: '/team-logos/inter-milan.png',
   'Inter Milano': '/team-logos/inter-milan.png',
+  'Kansas State': '/team-logos/kansas-state-wildcats.png',
+  'Kansas State Wildcats': '/team-logos/kansas-state-wildcats.png',
+  'Washington State': '/team-logos/washington-state-cougars.png',
+  'Washington State Cougars': '/team-logos/washington-state-cougars.png',
 };
 
 const leagueLogoPaths = new Set(['nfl', 'nba', 'mlb', 'epl', 'laliga']);
@@ -39,6 +47,7 @@ const collegeAbbreviations = {
   'Miami Hurricanes': 'MIA', 'Michigan Wolverines': 'MICH', 'Mississippi State Bulldogs': 'MSST',
   'Notre Dame Fighting Irish': 'ND', 'Ohio State Buckeyes': 'OSU', 'Oklahoma Sooners': 'OU',
   'Oklahoma State Cowboys': 'OKST', 'Ole Miss Rebels': 'MISS', 'Oregon Ducks': 'ORE',
+  'Kansas State Wildcats': 'KSU', 'Washington State Cougars': 'WSU',
   'Penn State Nittany Lions': 'PSU', 'South Carolina Gamecocks': 'SC', 'Tennessee Volunteers': 'TENN',
   'Texas Longhorns': 'TEX', 'Texas A&M Aggies': 'TAMU', 'Utah Utes': 'UTAH',
   'Washington Huskies': 'WASH', 'Wisconsin Badgers': 'WIS',
@@ -50,7 +59,7 @@ const collegeShortNames = {
   'Michigan State Spartans': 'Michigan St.', 'Ohio State Buckeyes': 'Ohio State',
   'Penn State Nittany Lions': 'Penn State', 'Arizona State Sun Devils': 'Arizona St.',
   'Iowa State Cyclones': 'Iowa State', 'Boise State Broncos': 'Boise St.',
-  'Oregon State Beavers': 'Oregon St.',
+  'Oregon State Beavers': 'Oregon St.', 'Washington State Cougars': 'Washington St.',
 };
 
 function normalizedName(name = '') { return String(name).trim().replace(/\s+/g, ' '); }
