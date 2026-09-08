@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, MapPin, Radio, Tv, X } from 'lucide-react';
 import { leagues } from '../sports/leagues.js';
 import { getPriorityReasons, getPriorityScore, getPriorityTier } from '../sports/priority.js';
-import { getWatchability } from '../sports/watchability.js';
+import { getGameScoreSnapshot } from '../sports/game-score.js';
 import { formatScoreboardMeta } from '../sports/clock.js';
 import { TeamMark, getDisplayTeamName } from './TeamMark.jsx';
 import './GameDetailModal.css';
@@ -24,7 +24,7 @@ export function GameDetailModal({ game, onClose }) {
   const countdown = useMemo(() => game ? new Date(game.startTime).getTime() - now : 0, [game, now]);
   if (!game) return null;
 
-  const league = leagues.find((item) => item.id === game.leagueId); const tier = getPriorityTier(game); const priorityScore = getPriorityScore(game); const watch = getWatchability(game);
+  const league = leagues.find((item) => item.id === game.leagueId); const priorityScore = getPriorityScore(game); const gameScore = getGameScoreSnapshot(game); const scoreReasons = gameScore.reasons; const scoreLabel = gameScore.level;
   const awayScore = scoreFor(game, 'away'); const homeScore = scoreFor(game, 'home'); const isLive = game.status === 'live'; const isFinal = game.status === 'final'; const metaScore = formatScoreboardMeta(game);
   const away = game.awayTeam || { name: 'TBD' }; const home = game.homeTeam || { name: 'TBD' }; const awayWinner = (isFinal || isLive) && awayScore != null && homeScore != null && awayScore > homeScore; const homeWinner = (isFinal || isLive) && awayScore != null && homeScore != null && homeScore > awayScore;
   const importanceReasons = getImportanceReasons(game); const importanceSummary = getImportanceSummary(game, importanceReasons); const liveLabel = isLive ? 'Game in progress' : isFinal ? 'Game complete' : countdown > 0 ? `Starts in ${formatCountdown(countdown)}` : 'Starting now';
@@ -32,10 +32,10 @@ export function GameDetailModal({ game, onClose }) {
 
   return <div className="game-detail-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className={`game-detail-modal ${isLive ? 'is-live' : ''} ${isFinal ? 'is-final' : ''}`} role="dialog" aria-modal="true" aria-labelledby="game-detail-title">
     <div className="game-detail-hero"><header className="game-detail-header"><div className="game-detail-league"><span className="game-detail-eyebrow">{league?.shortName || game.leagueId.toUpperCase()}</span></div><button type="button" className="icon-button game-detail-close" onClick={onClose} aria-label="Close game details"><X size={18} /></button></header>
-      <div className="game-detail-status-row"><span className={`game-detail-status ${isLive ? 'live' : ''}`}>{isLive ? <span className="game-detail-live-dot" /> : <span className="game-detail-status-mark" />}{statusLabel(game)}</span><span className={`game-detail-watch watch-${watch.label.toLowerCase()}`}><strong>{watch.score}</strong><span>{watch.label}</span></span></div>
+      <div className="game-detail-status-row"><span className={`game-detail-status ${isLive ? 'live' : ''}`}>{isLive ? <span className="game-detail-live-dot" /> : <span className="game-detail-status-mark" />}{statusLabel(game)}</span><span className={`game-detail-watch score-${scoreLabel.toLowerCase()}`}><strong>{gameScore.score}</strong><span>{scoreLabel}</span></span></div>
       {(isLive || isFinal) ? <div className="game-detail-scoreboard"><div className="game-detail-score-team"><TeamMark team={away} size="large" /><div className="game-detail-score-team-name">{getDisplayTeamName(away)}</div>{away?.abbreviation && <span>{away.abbreviation}</span>}<strong className={awayWinner ? 'winner' : ''}>{awayScore ?? '—'}</strong></div><div className="game-detail-score-middle"><span>{isLive ? 'LIVE' : 'FINAL'}</span>{metaScore && <small>{metaScore}</small>}</div><div className="game-detail-score-team"><TeamMark team={home} size="large" /><div className="game-detail-score-team-name">{getDisplayTeamName(home)}</div>{home?.abbreviation && <span>{home.abbreviation}</span>}<strong className={homeWinner ? 'winner' : ''}>{homeScore ?? '—'}</strong></div></div> : <div className="game-detail-matchup"><TeamPanel team={away} score={awayScore} winner={false} live={false} /><div className="game-detail-center"><div className="game-detail-countdown">{liveLabel}</div><div className="game-detail-vs">VS</div></div><TeamPanel team={home} score={homeScore} winner={false} live={false} /></div>}
-      <div className="game-detail-watchline"><div><span>Watch score</span><strong>{watch.score} · {watch.label}</strong></div><div className="game-detail-watch-reasons">{watch.reasons.map((reason) => <span key={reason}>{reason}</span>)}</div></div>
-      {importanceReasons.length > 0 && <div className="game-detail-storyline"><div><span>Why this matters</span><strong>{importanceSummary}</strong><div className="game-detail-reasons">{importanceReasons.map((reason) => <span key={reason}>{reason}</span>)}</div><small>Importance {priorityScore}/100</small></div></div>}
+      <div className="game-detail-watchline"><div><span>Game Score</span><strong>{gameScore.score} · {scoreLabel}</strong></div><div className="game-detail-watch-reasons">{scoreReasons.map((reason) => <span key={reason}>{reason}</span>)}</div></div>
+      {importanceReasons.length > 0 && <div className="game-detail-storyline"><div><span>Why this matters</span><strong>{importanceSummary}</strong><div className="game-detail-reasons">{importanceReasons.map((reason) => <span key={reason}>{reason}</span>)}</div><small>Game Score incorporates personal relevance, live drama, and game context.</small></div></div>}
     </div>
     <div className="game-detail-content"><div className="game-detail-info">{meta.map(({ label, value, icon: Icon }) => <div className="game-detail-info-row" key={label}><span className="game-detail-info-label">{Icon ? <Icon size={15} /> : <span className="detail-dot" />}{label}</span><strong>{value}</strong></div>)}</div><div className="game-detail-live-note">{isLive ? <><Radio size={14} /> Live score updates every 30 seconds</> : isFinal ? 'Final score' : liveLabel}</div></div>
   </div></div>;
