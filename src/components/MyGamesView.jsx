@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowUpRight, CalendarDays, Radio, Sparkles, Trophy } from 'lucide-react';
+import { Radio } from 'lucide-react';
 import { getMyGamesSections } from '../sports/selectors.js';
 import { GameCard } from './GameCard.jsx';
 import './MyGamesView.css';
@@ -29,9 +29,8 @@ function Section({ eyebrow, title, games, emptyMessage, onOpenGame }) {
 export function MyGamesView({ games, now, onOpenGame }) {
   const { today, upcoming } = getMyGamesSections(games, now);
   const liveGames = today.filter((game) => game.status === 'live');
+  const todayNonLive = today.filter((game) => game.status !== 'live');
   const hasGames = today.length > 0 || upcoming.length > 0;
-  const nextGame = today.find((game) => game.status === 'scheduled') || upcoming.find((game) => game.status === 'scheduled') || upcoming[0];
-  const favoriteGames = [...today, ...upcoming].filter((game) => game.homeTeam?.favorite || game.awayTeam?.favorite);
 
   if (!hasGames) {
     return (
@@ -48,61 +47,34 @@ export function MyGamesView({ games, now, onOpenGame }) {
       <header className="my-games-intro">
         <div className="my-games-title-block">
           <span className="day-kicker">My Games</span>
-          <h1>Your highest-signal games</h1>
-          <p>Live first, then the most important games from your seven-day window.</p>
+          <h1>What matters today</h1>
+          <p>Live first. Then the strongest games from your category scope.</p>
         </div>
         <div className="signal-status"><span className="signal-status-dot" />Signal active</div>
       </header>
 
-      <div className="my-games-overview" aria-label="Sports calendar overview">
-        <div className="overview-stat overview-live">
-          <span className="overview-icon"><Radio size={15} /></span>
-          <div><strong>{liveGames.length}</strong><span>Live now</span></div>
-        </div>
-        <div className="overview-stat">
-          <span className="overview-icon"><CalendarDays size={15} /></span>
-          <div><strong>{today.length}</strong><span>Today</span></div>
-        </div>
-        <div className="overview-stat">
-          <span className="overview-icon"><Trophy size={15} /></span>
-          <div><strong>{favoriteGames.length}</strong><span>Favorites</span></div>
-        </div>
-        <div className="overview-stat overview-window">
-          <span className="overview-icon"><Sparkles size={15} /></span>
-          <div><strong>7</strong><span>Day signal</span></div>
-        </div>
-      </div>
-
       {liveGames.length > 0 && (
         <section className="live-center" aria-label="Live games">
           <div className="live-center-header">
-            <div><span className="day-kicker live-kicker"><span className="live-pulse" />Live center</span><h2>Games happening now</h2></div>
+            <div>
+              <span className="day-kicker live-kicker"><span className="live-pulse" />Live now</span>
+              <h2>Games happening now</h2>
+            </div>
             <span>{liveGames.length} live</span>
           </div>
           <div className="live-center-grid">
-            {liveGames.map((game) => <GameCard key={game.id} game={game} compact onOpen={onOpenGame} />)}
+            {liveGames.map((game) => <GameCard key={game.id} game={game} onOpen={onOpenGame} />)}
           </div>
         </section>
-      )}
-
-      {nextGame && (
-        <button type="button" className="next-up-card" onClick={() => onOpenGame?.(nextGame)}>
-          <div className="next-up-copy">
-            <span className="day-kicker">Next up</span>
-            <strong>{nextGame.homeTeam?.name || 'Home'} <span>vs</span> {nextGame.awayTeam?.name || 'Away'}</strong>
-            <p>{new Date(nextGame.startTime).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })} · {new Date(nextGame.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</p>
-          </div>
-          <span className="next-up-action"><ArrowUpRight size={17} /></span>
-        </button>
       )}
 
       <div className="my-games-sections">
         <Section
           eyebrow="Today"
-          title="Today's Games"
-          games={today}
+          title={liveGames.length > 0 ? "Today's remaining games" : "Today's Games"}
+          games={todayNonLive}
           onOpenGame={onOpenGame}
-          emptyMessage="No games from your category scope today."
+          emptyMessage={liveGames.length > 0 ? 'Live games are above. Nothing else from your category scope is scheduled today.' : 'No games from your category scope today.'}
         />
 
         <Section

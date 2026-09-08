@@ -3,6 +3,7 @@ import { CalendarDays, MapPin, Radio, Tv, X } from 'lucide-react';
 import { leagues } from '../sports/leagues.js';
 import { getPriorityReasons, getPriorityScore, getPriorityTier } from '../sports/priority.js';
 import { getWatchability } from '../sports/watchability.js';
+import { formatScoreboardMeta } from '../sports/clock.js';
 import { TeamMark, getDisplayTeamName } from './TeamMark.jsx';
 import './GameDetailModal.css';
 
@@ -12,7 +13,6 @@ function detailValue(value) { if (!value) return null; return String(value).repl
 function formatDate(startTime) { return new Date(startTime).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }); }
 function formatTime(startTime) { return new Date(startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
 function formatCountdown(milliseconds) { const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000)); const days = Math.floor(totalSeconds / 86400); const hours = Math.floor((totalSeconds % 86400) / 3600); const minutes = Math.floor((totalSeconds % 3600) / 60); const seconds = totalSeconds % 60; if (days > 0) return `${days}d ${hours}h`; if (hours > 0) return `${hours}h ${minutes}m`; return `${minutes}m ${seconds}s`; }
-function scoreboardMeta(game) { const period = game.period != null ? `Q${game.period}` : ''; const clock = game.clock || ''; if (game.isOvertime) return period ? `${period} · OT` : 'OVERTIME'; if (period && clock) return `${period} · ${clock}`; return period || clock || ''; }
 function getImportanceReasons(game) { const reasons = getPriorityReasons(game); if (reasons.length) return reasons; if (game.leagueId === 'ucl') return [detailValue(game.uclStage || game.round) || 'Champions League matchup']; return []; }
 function getImportanceSummary(game, reasons) { if (reasons.length === 0) return null; const tier = getPriorityTier(game); if (tier === 0) return 'One of the highest-priority games on your calendar.'; if (tier === 1) return 'A must-see matchup based on your teams and sports priorities.'; if (tier === 2) return 'A favorite-team game that belongs near the top of your schedule.'; if (tier <= 3) return 'A high-signal event worth surfacing ahead of routine games.'; return 'This game is being surfaced because it has meaningful competitive context.'; }
 function TeamPanel({ team, score, winner, live }) { return <div className={`game-detail-team-panel ${winner ? 'winner' : ''}`}><TeamMark team={team} size="large" /><div className="game-detail-team-name">{getDisplayTeamName(team)}</div>{team?.abbreviation && <div className="game-detail-team-abbr">{team.abbreviation}</div>}{score != null && <div className="game-detail-score">{score}</div>}{live && <span className="game-detail-team-state">{winner ? 'LEADING' : 'IN PLAY'}</span>}{!live && winner && <span className="game-detail-team-state">WINNER</span>}</div>; }
@@ -25,7 +25,7 @@ export function GameDetailModal({ game, onClose }) {
   if (!game) return null;
 
   const league = leagues.find((item) => item.id === game.leagueId); const tier = getPriorityTier(game); const priorityScore = getPriorityScore(game); const watch = getWatchability(game);
-  const awayScore = scoreFor(game, 'away'); const homeScore = scoreFor(game, 'home'); const isLive = game.status === 'live'; const isFinal = game.status === 'final'; const metaScore = scoreboardMeta(game);
+  const awayScore = scoreFor(game, 'away'); const homeScore = scoreFor(game, 'home'); const isLive = game.status === 'live'; const isFinal = game.status === 'final'; const metaScore = formatScoreboardMeta(game);
   const away = game.awayTeam || { name: 'TBD' }; const home = game.homeTeam || { name: 'TBD' }; const awayWinner = (isFinal || isLive) && awayScore != null && homeScore != null && awayScore > homeScore; const homeWinner = (isFinal || isLive) && awayScore != null && homeScore != null && homeScore > awayScore;
   const importanceReasons = getImportanceReasons(game); const importanceSummary = getImportanceSummary(game, importanceReasons); const liveLabel = isLive ? 'Game in progress' : isFinal ? 'Game complete' : countdown > 0 ? `Starts in ${formatCountdown(countdown)}` : 'Starting now';
   const meta = [{ label: 'Date', value: formatDate(game.startTime), icon: CalendarDays }, { label: 'Time', value: formatTime(game.startTime), icon: null }, game.venue ? { label: 'Venue', value: game.venue, icon: MapPin } : null, game.network ? { label: 'Watch', value: game.network, icon: Tv } : null].filter(Boolean);
@@ -37,6 +37,6 @@ export function GameDetailModal({ game, onClose }) {
       <div className="game-detail-watchline"><div><span>Watch score</span><strong>{watch.score} · {watch.label}</strong></div><div className="game-detail-watch-reasons">{watch.reasons.map((reason) => <span key={reason}>{reason}</span>)}</div></div>
       {importanceReasons.length > 0 && <div className="game-detail-storyline"><div><span>Why this matters</span><strong>{importanceSummary}</strong><div className="game-detail-reasons">{importanceReasons.map((reason) => <span key={reason}>{reason}</span>)}</div><small>Importance {priorityScore}/100</small></div></div>}
     </div>
-    <div className="game-detail-content"><div className="game-detail-info">{meta.map(({ label, value, icon: Icon }) => <div className="game-detail-info-row" key={label}><span className="game-detail-info-label">{Icon ? <Icon size={15} /> : <span className="detail-dot" />}{label}</span><strong>{value}</strong></div>)}</div><div className="game-detail-live-note">{isLive ? <><Radio size={14} /> Live score updates every 20 seconds</> : isFinal ? 'Final score' : liveLabel}</div></div>
+    <div className="game-detail-content"><div className="game-detail-info">{meta.map(({ label, value, icon: Icon }) => <div className="game-detail-info-row" key={label}><span className="game-detail-info-label">{Icon ? <Icon size={15} /> : <span className="detail-dot" />}{label}</span><strong>{value}</strong></div>)}</div><div className="game-detail-live-note">{isLive ? <><Radio size={14} /> Live score updates every 30 seconds</> : isFinal ? 'Final score' : liveLabel}</div></div>
   </div></div>;
 }
