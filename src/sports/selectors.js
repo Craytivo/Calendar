@@ -1,6 +1,7 @@
 import { teams } from './types.js';
 import { getPriorityScore, getPriorityTier, isMajorGameForPriority, isMajorUclGameForPriority } from './priority.js';
 import { getWatchScore } from './watchability.js';
+import { getLiveSignalRank } from './game-intelligence.js';
 
 const MY_GAMES_WINDOW_DAYS = 7;
 const MY_GAMES_SECTION_LIMIT = 5;
@@ -20,6 +21,7 @@ function isDisplayableMyGame(game) { return isFavoriteGame(game) || isMustSeeGam
 function isLive(game) { return game.status === 'live'; }
 function compareForDisplay(a, b) {
   const liveDifference = Number(isLive(b)) - Number(isLive(a)); if (liveDifference !== 0) return liveDifference;
+  if (isLive(a) && isLive(b)) { const signalDifference = getLiveSignalRank(a) - getLiveSignalRank(b); if (signalDifference !== 0) return signalDifference; }
   const priorityDifference = getPriorityTier(a) - getPriorityTier(b); if (priorityDifference !== 0) return priorityDifference;
   const watchDifference = getWatchScore(b) - getWatchScore(a); if (watchDifference !== 0) return watchDifference;
   const scoreDifference = getPriorityScore(b) - getPriorityScore(a); if (scoreDifference !== 0) return scoreDifference;
