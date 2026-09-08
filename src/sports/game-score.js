@@ -8,7 +8,7 @@ function number(value) { const parsed = Number(value); return Number.isFinite(pa
 function scoreFor(game, side) { const value = side === 'away' ? game?.awayScore ?? game?.awayTeam?.score : game?.homeScore ?? game?.homeTeam?.score; return number(value); }
 function difference(game) { const away = scoreFor(game, 'away'); const home = scoreFor(game, 'home'); return away === undefined || home === undefined ? undefined : Math.abs(away - home); }
 function totalPoints(game) { const away = scoreFor(game, 'away'); const home = scoreFor(game, 'home'); return away === undefined || home === undefined ? undefined : away + home; }
-function isFavorite(game) { return favoriteTeamIds.has(game?.homeTeamId) || favoriteTeamIds.has(game?.awayTeamId) || Boolean(game?.homeTeam?.favorite || game?.awayTeam?.favorite); }
+function isFavorite(game) { return favoriteTeamIds.has(game?.homeTeamId) || favoriteTeamIds.has(game?.awayTeamId); }
 function isOvertime(game) { return game?.isOvertime === true || game?.overtime === true || /overtime|extra time|aet/.test(String(game?.statusDetail ?? game?.shortDetail ?? '').toLowerCase()); }
 
 function isLate(game) {
