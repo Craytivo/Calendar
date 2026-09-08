@@ -2,12 +2,5 @@
 .next-up-header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border-soft)}
 .next-up-header h2{margin:4px 0 0;font-family:'Manrope';font-size:19px;line-height:1.08;letter-spacing:-.045em;color:var(--text)}
 .next-up-countdown{color:var(--muted);font-size:8px;font-weight:850;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
-.next-up-content{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(220px,.7fr);gap:10px}
-.next-up-card .game-card{height:100%;background:var(--surface)}
-.next-up-reason{display:flex;flex-direction:column;justify-content:center;padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--surface-raised);color:var(--text)}
-.next-up-label{color:var(--subtle);font-size:8px;font-weight:850;letter-spacing:.13em;text-transform:uppercase}
-.next-up-reason h3{margin:6px 0 4px;font-family:'Manrope';font-size:16px;line-height:1.12;letter-spacing:-.035em;color:var(--text)}
-.next-up-reason p{margin:0;color:var(--muted);font-size:10px;line-height:1.45}
-.next-up-reason button{display:inline-flex;align-items:center;justify-content:center;align-self:flex-start;gap:6px;margin-top:13px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:9px;font-weight:850;letter-spacing:.02em;cursor:pointer;transition:border-color .16s ease,transform .16s ease}
-.next-up-reason button:hover{border-color:var(--muted);transform:translateY(-1px)}
-@media(max-width:760px){.next-up{padding:13px;border-radius:13px;margin-bottom:18px}.next-up-header{align-items:flex-start;gap:10px}.next-up-header h2{font-size:18px}.next-up-countdown{padding-top:2px;font-size:8px}.next-up-content{grid-template-columns:1fr}.next-up-reason{padding:12px}.next-up-reason h3{font-size:15px}.next-up-reason button{width:100%;margin-top:11px}}
+.next-up-card .game-card{width:100%;background:var(--surface)}
+@media(max-width:760px){.next-up{padding:13px;border-radius:13px;margin-bottom:18px}.next-up-header{align-items:flex-start;gap:10px}.next-up-header h2{font-size:18px}.next-up-countdown{padding-top:2px;font-size:8px}}
