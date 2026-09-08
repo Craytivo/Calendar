@@ -1,7 +1,7 @@
 import { PRIORITY_TIERS, teams } from './types.js';
+import { favoriteTeamIds } from './team-identity.js';
 
 const mustSeeTeamIds = new Set(teams.filter((team) => team.favoriteTier === 'must-see').map((team) => team.id));
-const favoriteTeamIds = new Set(teams.filter((team) => team.favorite).map((team) => team.id));
 const realMadridTeamIds = new Set(['real-madrid']);
 const LEAGUE_PRIORITY = { nfl: 0, nba: 1, 'ncaa-football': 2, ucl: 3, laliga: 4, epl: 5, mlb: 6, nhl: 7, ufc: 8 };
 
