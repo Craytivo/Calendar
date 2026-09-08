@@ -1,8 +1,8 @@
-import { getPriorityReasons, getPriorityScore, getPriorityTier, getLeaguePriority, isMajorGameForPriority, isMajorUclGameForPriority } from './priority.js';
-import { getWatchScore } from './watchability.js';
+import { getPriorityReasons, getPriorityScore, getPriorityTier, isMajorGameForPriority, isMajorUclGameForPriority } from './priority.js';
+import { getGameScore } from './game-score.js';
 
 function localKey(value) { const date = new Date(value); return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`; }
-function rank(game) { return getPriorityTier(game) * -1000 + getPriorityScore(game) * 10 + getWatchScore(game) - getLeaguePriority(game.leagueId) * .01; }
+function rank(game) { return getGameScore(game); }
 export function getGamesForDay(games, date) { const key = localKey(date); return games.filter((game) => localKey(game.startTime) === key); }
 export function getDaySummary(games, date) {
   const dayGames = getGamesForDay(games, date);
