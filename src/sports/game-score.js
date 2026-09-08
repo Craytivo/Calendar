@@ -1,6 +1,6 @@
 import { favoriteTeamIds } from './team-identity.js';
 import { getPriorityScore } from './priority.js';
-import { getNFLMarketContext, getNFLMarketScore } from './nfl-market.js';
+import { getSportMarketContext, getSportMarketScore, getSportMarketReasons } from './market-context.js';
 
 const SOCCER = new Set(['soccer', 'epl', 'laliga', 'ucl']);
 const FIELD_SPORTS = new Set(['nfl', 'nba', 'ncaa-football', 'nhl']);
@@ -23,8 +23,6 @@ function isLate(game) {
   return false;
 }
 
-// Close scores are intentionally modest until a game is actually late.
-// A generic non-favorite game should not become a top calendar item merely because it is 1-1 in the second quarter/period.
 function closeScoreBonus(game) {
   const diff = difference(game);
   if (diff === undefined) return 0;
@@ -125,10 +123,10 @@ export function getGameScore(game, { peakScore } = {}) {
   const personal = importance(game);
   const drama = game.status === 'final' ? finalDrama(game) : liveDrama(game);
   const base = baseInterest(game);
-  // NFL betting-market context is a bounded pregame prior. It contributes to
-  // the canonical Game Score without replacing the existing contextual model.
-  const market = game?.leagueId === 'nfl' && game?.status !== 'live' && game?.status !== 'final'
-    ? getNFLMarketScore(game)
+  // Market context is a bounded pregame prior. Each sport uses its own market
+  // structure and scoring baseline; live drama remains the primary dynamic signal.
+  const market = game?.status !== 'live' && game?.status !== 'final'
+    ? getSportMarketScore(game)
     : 0;
   const current = Math.min(100, Math.round(personal + drama + base + market));
   if (game.status === 'final' && Number.isFinite(Number(peakScore))) return Math.min(100, Math.max(current, Number(peakScore)));
@@ -147,13 +145,7 @@ export function getGameScoreLevel(score) {
 export function getGameScoreReasons(game) {
   const reasons = [];
   if (isFavorite(game)) reasons.push('Favorite team');
-  if (game?.leagueId === 'nfl' && game?.status !== 'live' && game?.status !== 'final') {
-    const market = getNFLMarketContext(game);
-    if (market.available) {
-      if (market.competitivenessScore >= 80) reasons.push('Expected close game');
-      else if (market.scoringEnvironmentScore >= 75) reasons.push('High scoring expectation');
-    }
-  }
+  if (game?.status !== 'live' && game?.status !== 'final') reasons.push(...getSportMarketReasons(game));
   if (game?.status === 'live') {
     const diff = difference(game);
     if (isOvertime(game)) reasons.push('Overtime');
@@ -180,14 +172,14 @@ export function getGameScoreSnapshot(game, peakScore) {
 }
 
 export function getGameScoreComponents(game) {
-  const market = game?.leagueId === 'nfl' ? getNFLMarketContext(game) : undefined;
+  const market = getSportMarketContext(game);
   return {
     personalRelevance: Math.round(importance(game)),
     liveDrama: Math.round(liveDrama(game)),
     finalDrama: Math.round(finalDrama(game)),
     baseInterest: Math.round(baseInterest(game)),
-    marketExcitement: market?.available ? Math.round(getNFLMarketScore(game)) : 0,
-    marketCompetitiveness: market?.available ? market.competitivenessScore : 0,
-    marketScoringEnvironment: market?.available ? market.scoringEnvironmentScore : 0,
+    marketExcitement: market.available ? Math.round(market.contribution) : 0,
+    marketCompetitiveness: market.available ? market.competitivenessScore : 0,
+    marketScoringEnvironment: market.available ? market.scoringEnvironmentScore : 0,
   };
 }
