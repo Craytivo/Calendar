@@ -13,6 +13,7 @@ import { ViewSwitcher } from './components/ViewSwitcher.jsx';
 import './styles.css';
 import './styles-polish.css';
 import './theme-contrast.css';
+import './spacing-refinement.css';
 
 const viewerTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 const CALENDAR_REFRESH_MS = 300_000;
@@ -97,7 +98,6 @@ function App() {
   }, [games]);
 
   const todayLeagueQuery = todayLeagueIds.join(',');
-  const hasLiveGames = games.some((game) => game.status === 'live');
 
   const loadLiveGames = async ({ silent = true } = {}) => {
     if (!todayLeagueQuery) return;
