@@ -9,6 +9,7 @@ const teamIdentity = {
   dodgers: { label: 'LAD', color: '#005A9C' },
   oilers: { label: 'EDM', color: '#FF4C00' },
   vikings: { label: 'MIN', color: '#4F2683' },
+  110: { label: 'INT', color: '#00529B' },
 };
 
 const favoriteLogoPaths = {
@@ -20,9 +21,16 @@ const favoriteLogoPaths = {
   dodgers: '/team-logos/dodgers.png',
   oilers: '/team-logos/oilers.png',
   vikings: '/team-logos/vikings.png',
+  'inter-milan': '/team-logos/inter-milan.png',
 };
 
-const leagueLogoPaths = new Set(['nfl', 'nba', 'mlb']);
+const localNameLogoPaths = {
+  'Inter Milan': '/team-logos/inter-milan.png',
+  Internazionale: '/team-logos/inter-milan.png',
+  'Inter Milano': '/team-logos/inter-milan.png',
+};
+
+const leagueLogoPaths = new Set(['nfl', 'nba', 'mlb', 'epl', 'laliga']);
 
 const collegeAbbreviations = {
   'Alabama Crimson Tide': 'ALA', 'Arkansas Razorbacks': 'ARK', 'Auburn Tigers': 'AUB',
@@ -66,6 +74,8 @@ export function getDisplayTeamName(team) {
 
 function getLocalLogoPath(team) {
   if (favoriteLogoPaths[team?.id]) return favoriteLogoPaths[team.id];
+  const name = normalizedName(team?.name);
+  if (localNameLogoPaths[name]) return localNameLogoPaths[name];
   if (leagueLogoPaths.has(team?.leagueId) && team?.id) return `/team-logos/${team.leagueId}/${team.id}.png`;
   return null;
 }
