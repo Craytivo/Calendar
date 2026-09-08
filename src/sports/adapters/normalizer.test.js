@@ -1,47 +1,25 @@
 import {
+  getClockMode,
   isNormalizedGame,
   normalizeGame,
   normalizeGames,
   normalizeStatus,
 } from './normalizer.js';
 
-function assert(condition, message) {
-  if (!condition) throw new Error(message);
-}
+function assert(condition, message) { if (!condition) throw new Error(message); }
 
 export function runNormalizerChecks() {
   assert(normalizeStatus('in_progress') === 'live', 'in_progress should normalize to live');
   assert(normalizeStatus('completed') === 'final', 'completed should normalize to final');
   assert(normalizeStatus('delayed') === 'postponed', 'delayed should normalize to postponed');
+  assert(getClockMode('ucl') === 'elapsed', 'UCL clock should be elapsed');
+  assert(getClockMode('epl') === 'elapsed', 'EPL clock should be elapsed');
+  assert(getClockMode('nba') === 'remaining', 'NBA clock should be remaining');
+  assert(getClockMode('nfl') === 'remaining', 'NFL clock should be remaining');
+  assert(getClockMode('nhl') === 'remaining', 'NHL clock should be remaining');
+  assert(getClockMode('mlb') === 'inning', 'MLB clock should be inning-based');
 
-  const normalized = normalizeGame({
-    eventId: 'game-1',
-    league: 'nba',
-    date: '2026-11-20T21:00:00Z',
-    state: 'scheduled',
-    homeScore: '108',
-    awayScore: 102,
-    home: {
-      teamId: 'nba-home',
-      displayName: 'Home Team',
-      abbr: 'HOM',
-      winPct: '0.75',
-      games: '20',
-      conferencePosition: '4',
-      score: '108',
-    },
-    away: {
-      teamId: 'nba-away',
-      displayName: 'Away Team',
-      abbr: 'AWY',
-      winPct: 0.7,
-      games: 20,
-      conferencePosition: 7,
-      score: 102,
-    },
-    isDivisional: false,
-  });
-
+  const normalized = normalizeGame({ eventId: 'game-1', league: 'nba', date: '2026-11-20T21:00:00Z', state: 'scheduled', homeScore: '108', awayScore: 102, home: { teamId: 'nba-home', displayName: 'Home Team', abbr: 'HOM', winPct: '0.75', games: '20', conferencePosition: '4', score: '108' }, away: { teamId: 'nba-away', displayName: 'Away Team', abbr: 'AWY', winPct: 0.7, games: 20, conferencePosition: 7, score: 102 }, isDivisional: false });
   assert(normalized.id === 'game-1', 'eventId should map to id');
   assert(normalized.leagueId === 'nba', 'league should map to leagueId');
   assert(normalized.homeTeamId === 'nba-home', 'home team ID should normalize');
@@ -52,28 +30,22 @@ export function runNormalizerChecks() {
   assert(normalized.awayScore === 102, 'away score should be preserved as a number');
   assert(normalized.homeTeam.score === 108, 'home team score should be preserved');
   assert(normalized.awayTeam.score === 102, 'away team score should be preserved');
+  assert(normalized.clockMode === 'remaining', 'NBA normalized game should declare remaining clock semantics');
   assert(normalized.startTime === '2026-11-20T21:00:00.000Z', 'date should normalize to ISO');
   assert(isNormalizedGame(normalized), 'normalized game should pass validation');
 
-  const teamScoreOnly = normalizeGame({
-    eventId: 'game-2',
-    league: 'nfl',
-    date: '2026-11-21T21:00:00Z',
-    status: 'final',
-    home: { teamId: 'home', name: 'Home', score: '24' },
-    away: { teamId: 'away', name: 'Away', score: '17' },
-  });
+  const soccer = normalizeGame({ eventId: 'soccer-1', league: 'ucl', date: '2026-09-08T18:00:00Z', home: { id: 'villa', name: 'Aston Villa' }, away: { id: 'brugge', name: 'Club Brugge' }, clock: '88:14', clockSeconds: 5294, status: 'live' });
+  assert(soccer.clockMode === 'elapsed', 'UCL normalized game should declare elapsed clock semantics');
 
+  const mlb = normalizeGame({ eventId: 'mlb-1', league: 'mlb', date: '2026-09-08T18:00:00Z', home: { id: 'home', name: 'Home' }, away: { id: 'away', name: 'Away' }, period: 10, status: 'live' });
+  assert(mlb.clockMode === 'inning', 'MLB normalized game should declare inning clock semantics');
+
+  const teamScoreOnly = normalizeGame({ eventId: 'game-2', league: 'nfl', date: '2026-11-21T21:00:00Z', status: 'final', home: { teamId: 'home', name: 'Home', score: '24' }, away: { teamId: 'away', name: 'Away', score: '17' } });
   assert(teamScoreOnly.homeScore === 24, 'home score should fall back to team score');
   assert(teamScoreOnly.awayScore === 17, 'away score should fall back to team score');
 
-  const batch = normalizeGames([
-    normalized,
-    { eventId: 'missing-date', league: 'nfl' },
-  ]);
-
+  const batch = normalizeGames([normalized, { eventId: 'missing-date', league: 'nfl' }]);
   assert(batch.length === 1, 'invalid games should be removed from normalized batches');
-
   return true;
 }
 
