@@ -5,6 +5,8 @@ const leagueSources = {
   nfl: { sport: 'football', league: 'nfl' },
   nba: { sport: 'basketball', league: 'nba' },
   mlb: { sport: 'baseball', league: 'mlb' },
+  epl: { sport: 'soccer', league: 'eng.1' },
+  laliga: { sport: 'soccer', league: 'esp.1' },
 };
 
 const favoriteLogos = {
@@ -16,6 +18,7 @@ const favoriteLogos = {
   dodgers: { url: 'https://a.espncdn.com/i/teamlogos/mlb/500/lad.png' },
   oilers: { url: 'https://a.espncdn.com/i/teamlogos/nhl/500/25.png' },
   vikings: { league: 'nfl', externalId: '16' },
+  'inter-milan': { url: 'https://a.espncdn.com/i/teamlogos/soccer/500/110.png' },
 };
 
 const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports';
@@ -49,8 +52,8 @@ async function fileExists(filePath) {
 
 const failures = [];
 
-// Local logo assets are persistent build inputs. Existing files are reused so
-// normal builds never redownload or rewrite the logo tree.
+// Local league logo assets are persistent build inputs. Existing files are reused
+// so normal builds never redownload or rewrite the logo tree.
 for (const [leagueId, source] of Object.entries(leagueSources)) {
   try {
     const payload = await fetchJson(`${ESPN_BASE}/${source.sport}/${source.league}/teams?limit=100`);
