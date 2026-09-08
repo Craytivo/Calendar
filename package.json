@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node ./node_modules/vite/bin/vite.js build",
     "preview": "npm run build && wrangler dev",
     "preview:cloudflare": "npm run prepare:logos && npm run build && wrangler dev",
     "dev:cloudflare": "npm run prepare:logos && npm run build && wrangler dev",
