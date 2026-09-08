@@ -14,7 +14,6 @@ const favoriteLogos = {
   'sac-kings': { league: 'nba', externalId: '23' },
   'oregon-ducks': { url: 'https://a.espncdn.com/i/teamlogos/ncaa/500/2483.png' },
   'kansas-state-wildcats': { league: 'ncaa-football', externalId: '2306' },
-  'washington-state-cougars': { league: 'ncaa-football', externalId: '265' },
   'real-madrid': { url: 'https://a.espncdn.com/i/teamlogos/soccer/500/86.png' },
   tottenham: { url: 'https://a.espncdn.com/i/teamlogos/soccer/500/367.png' },
   'blue-jays': { league: 'mlb', externalId: '14' },
@@ -24,20 +23,46 @@ const favoriteLogos = {
   'inter-milan': { url: 'https://a.espncdn.com/i/teamlogos/soccer/500/110.png' },
 };
 
+// Logo-only assets are intentionally not favorites and do not affect game priority.
+const logoOnlyLogos = {
+  'washington-state-cougars': { league: 'ncaa-football', externalId: '265' },
+};
+
 const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports';
+const ESPN_FALLBACK_BASE = 'https://site.web.api.espn.com/apis/site/v2/sports';
 const outputDir = path.resolve('public/team-logos');
 
 await mkdir(outputDir, { recursive: true });
 
-async function fetchJson(url) {
-  const response = await fetch(url, { headers: { Accept: 'application/json' } });
+function fallbackUrlFor(url) { return url.replace(ESPN_BASE, ESPN_FALLBACK_BASE); }
+
+async function fetchWithFallback(url) {
+  let response;
+  try {
+    response = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (response.ok) return response;
+  } catch {}
+  const fallbackUrl = fallbackUrlFor(url);
+  response = await fetch(fallbackUrl, { headers: { Accept: 'application/json' } });
   if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
+  return response;
+}
+
+async function fetchJson(url) {
+  const response = await fetchWithFallback(url);
   return response.json();
 }
 
 async function saveLogo(url, outputPath) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  let response;
+  try {
+    response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  } catch {
+    const fallbackUrl = url.replace('https://a.espncdn.com', 'https://a.espncdn.com');
+    response = await fetch(fallbackUrl);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  }
   const buffer = Buffer.from(await response.arrayBuffer());
   if (!buffer.length) throw new Error('empty image');
   await mkdir(path.dirname(outputPath), { recursive: true });
@@ -65,7 +90,9 @@ for (const [leagueId, source] of Object.entries(leagueSources)) {
       const logoUrl = team.logos?.[0]?.href || team.logo;
       if (!logoUrl || !team.id) continue;
       const outputPath = path.join(outputDir, leagueId, `${team.id}.png`);
-      if (await fileExists(outputPath)) continue;
+      // Refresh soccer league assets so EPL/La Liga logos cannot remain stale or missing.
+      const shouldRefresh = leagueId === 'epl' || leagueId === 'laliga';
+      if (!shouldRefresh && await fileExists(outputPath)) continue;
       try {
         await saveLogo(logoUrl, outputPath);
         console.log(`Saved local ${leagueId} logo: ${team.id}`);
@@ -79,24 +106,31 @@ for (const [leagueId, source] of Object.entries(leagueSources)) {
   }
 }
 
-for (const [teamId, favorite] of Object.entries(favoriteLogos)) {
+async function saveConfiguredLogo(teamId, config, label) {
   const outputPath = path.join(outputDir, `${teamId}.png`);
-  if (await fileExists(outputPath)) continue;
-
   try {
-    let logoUrl = favorite.url;
+    let logoUrl = config.url;
     if (!logoUrl) {
-      const source = leagueSources[favorite.league];
-      const payload = await fetchJson(`${ESPN_BASE}/${source.sport}/${source.league}/teams/${favorite.externalId}`);
+      const source = leagueSources[config.league];
+      const payload = await fetchJson(`${ESPN_BASE}/${source.sport}/${source.league}/teams/${config.externalId}`);
       const team = payload?.team;
       logoUrl = team?.logos?.[0]?.href || team?.logo;
     }
     if (!logoUrl) throw new Error('no logo returned');
     await saveLogo(logoUrl, outputPath);
-    console.log(`Saved local favorite logo: ${teamId}`);
+    console.log(`Saved local ${label} logo: ${teamId}`);
   } catch (error) {
     failures.push(`${teamId}: ${error.message}`);
   }
+}
+
+for (const [teamId, favorite] of Object.entries(favoriteLogos)) {
+  if (await fileExists(path.join(outputDir, `${teamId}.png`))) continue;
+  await saveConfiguredLogo(teamId, favorite, 'favorite');
+}
+
+for (const [teamId, logo] of Object.entries(logoOnlyLogos)) {
+  await saveConfiguredLogo(teamId, logo, 'logo-only');
 }
 
 if (failures.length) {
