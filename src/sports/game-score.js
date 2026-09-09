@@ -1,6 +1,7 @@
 import { favoriteTeamIds } from './team-identity.js';
 import { getPriorityScore } from './priority.js';
 import { getSportMarketContext, getSportMarketScore, getSportMarketReasons } from './market-context.js';
+import { calibrateGameScore, getHistoricalCalibrationProfile } from './historical-calibration.js';
 
 const SOCCER = new Set(['soccer', 'epl', 'laliga', 'ucl']);
 const FIELD_SPORTS = new Set(['nfl', 'nba', 'ncaa-football', 'nhl']);
@@ -118,8 +119,7 @@ function baseInterest(game) {
   return 4;
 }
 
-export function getGameScore(game, { peakScore } = {}) {
-  if (!game) return 0;
+function getRawGameScore(game) {
   const personal = importance(game);
   const drama = game.status === 'final' ? finalDrama(game) : liveDrama(game);
   const base = baseInterest(game);
@@ -128,9 +128,17 @@ export function getGameScore(game, { peakScore } = {}) {
   const market = game?.status !== 'live' && game?.status !== 'final'
     ? getSportMarketScore(game)
     : 0;
-  const current = Math.min(100, Math.round(personal + drama + base + market));
-  if (game.status === 'final' && Number.isFinite(Number(peakScore))) return Math.min(100, Math.max(current, Number(peakScore)));
-  return current;
+  return Math.min(100, Math.round(personal + drama + base + market));
+}
+
+export function getGameScore(game, { peakScore } = {}) {
+  if (!game) return 0;
+  const raw = getRawGameScore(game);
+  const calibrated = calibrateGameScore(raw, game?.leagueId);
+  if (game.status === 'final' && Number.isFinite(Number(peakScore))) {
+    return Math.min(100, Math.max(calibrated, calibrateGameScore(Number(peakScore), game?.leagueId)));
+  }
+  return calibrated;
 }
 
 export function getGameScoreLevel(score) {
@@ -173,7 +181,11 @@ export function getGameScoreSnapshot(game, peakScore) {
 
 export function getGameScoreComponents(game) {
   const market = getSportMarketContext(game);
+  const rawScore = getRawGameScore(game);
   return {
+    rawScore,
+    calibratedScore: calibrateGameScore(rawScore, game?.leagueId),
+    calibrationProfile: getHistoricalCalibrationProfile(game?.leagueId),
     personalRelevance: Math.round(importance(game)),
     liveDrama: Math.round(liveDrama(game)),
     finalDrama: Math.round(finalDrama(game)),
