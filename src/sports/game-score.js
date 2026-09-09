@@ -123,8 +123,6 @@ function getRawGameScore(game) {
   const personal = importance(game);
   const drama = game.status === 'final' ? finalDrama(game) : liveDrama(game);
   const base = baseInterest(game);
-  // Market context is a bounded pregame prior. Each sport uses its own market
-  // structure and scoring baseline; live drama remains the primary dynamic signal.
   const market = game?.status !== 'live' && game?.status !== 'final'
     ? getSportMarketScore(game)
     : 0;
@@ -136,7 +134,9 @@ export function getGameScore(game, { peakScore } = {}) {
   const raw = getRawGameScore(game);
   const calibrated = calibrateGameScore(raw, game?.leagueId);
   if (game.status === 'final' && Number.isFinite(Number(peakScore))) {
-    return Math.min(100, Math.max(calibrated, calibrateGameScore(Number(peakScore), game?.leagueId)));
+    // peakScore is already a displayed/calibrated score persisted by the client.
+    // Do not run it through the calibration curve a second time.
+    return Math.min(100, Math.max(calibrated, Number(peakScore)));
   }
   return calibrated;
 }
