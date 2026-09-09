@@ -3,7 +3,7 @@ import { getPriorityScore } from './priority.js';
 import { getSportMarketContext, getSportMarketScore, getSportMarketReasons } from './market-context.js';
 import { calibrateGameScore, getHistoricalCalibrationProfile } from './historical-calibration.js';
 
-const SOCCER = new Set(['soccer', 'epl', 'laliga', 'ucl']);
+const SOCCER = new Set(['soccer', 'epl', 'epl-cup', 'laliga', 'ucl']);
 const FIELD_SPORTS = new Set(['nfl', 'nba', 'ncaa-football', 'nhl']);
 
 function number(value) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : undefined; }
@@ -119,7 +119,23 @@ function baseInterest(game) {
   return 4;
 }
 
-function getRawGameScore(game) {
+export function getGameScoreSignals(game) {
+  const market = getSportMarketContext(game);
+  const priority = getPriorityScore(game);
+  return {
+    favorite: isFavorite(game) ? 1 : 0,
+    priority,
+    closeScore: Math.max(closeScoreBonus(game), 0),
+    lateGame: Math.max(lateGameBonus(game), 0),
+    overtime: isOvertime(game) ? 1 : 0,
+    elimination: game?.isElimination === true ? 1 : 0,
+    implications: (game?.hasPlayoffImplications || game?.hasSeedingImplications || game?.hasQualificationImplications) ? 1 : 0,
+    baseInterest: baseInterest(game),
+    marketExcitement: market.available ? market.contribution : 0,
+  };
+}
+
+export function getRawGameScore(game) {
   const personal = importance(game);
   const drama = game.status === 'final' ? finalDrama(game) : liveDrama(game);
   const base = baseInterest(game);
