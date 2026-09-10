@@ -61,6 +61,9 @@ export async function enrichGamesWithEspnStandings(games, year = new Date().getF
   const results = await Promise.allSettled(leagueIds.map(async (leagueId) => [leagueId, await getCachedStandings(leagueId, year)]));
   const byLeague = new Map(), diagnostics = [];
   for (const result of results) { if (result.status !== 'fulfilled') continue; const [leagueId, standings] = result.value, lookup = new Map(); for (const entry of standings.entries) { lookup.set(entry.id, entry); lookup.set(clean(entry.name), entry); } byLeague.set(leagueId, lookup); diagnostics.push({ leagueId, provider: standings.provider, cached: standings.cached, stale: standings.stale, deduped: standings.deduped ?? false, durationMs: standings.durationMs, ageMs: standings.ageMs ?? 0, count: standings.entries.length }); }
-  const enriched = games.map((game) => enrichGame(game, byLeague.get(game.leagueId) ?? new Map())); enriched.diagnostics = diagnostics; return enriched;
+  const enriched = games.map((game) => enrichGame(game, byLeague.get(game.leagueId) ?? new Map()));
+  enriched.games = enriched;
+  enriched.diagnostics = diagnostics;
+  return enriched;
 }
 export { ESPN_STANDINGS };
