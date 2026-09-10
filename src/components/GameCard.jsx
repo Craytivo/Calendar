@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Clock3, Star } from 'lucide-react';
 import { leagues } from '../sports/leagues.js';
-import { getPriorityScore, getPriorityTier, getPriorityReasons } from '../sports/priority.js';
+import { getPriorityScore, getPriorityReasons } from '../sports/priority.js';
 import { favoriteTeamIds } from '../sports/team-identity.js';
 import { getGameScore, getGameScoreLevel } from '../sports/game-score.js';
 import { getLiveGameSignal } from '../sports/game-intelligence.js';
@@ -18,15 +18,10 @@ function teamLabel(team, leagueId) { const name = getDisplayTeamName(team); cons
 function scoreFor(game, side) { const topLevel = side === 'away' ? game.awayScore : game.homeScore; if (topLevel != null) return topLevel; const teamScore = side === 'away' ? game.awayTeam?.score : game.homeTeam?.score; return teamScore != null ? teamScore : null; }
 function readPeakScore(gameId) { if (typeof window === 'undefined' || !gameId) return 0; try { const values = JSON.parse(window.localStorage.getItem(PEAK_SCORE_STORAGE_KEY) || '{}'); return Number(values[gameId]) || 0; } catch { return 0; } }
 function writePeakScore(gameId, score) { if (typeof window === 'undefined' || !gameId || !Number.isFinite(score)) return; try { const values = JSON.parse(window.localStorage.getItem(PEAK_SCORE_STORAGE_KEY) || '{}'); if (score <= (Number(values[gameId]) || 0)) return; values[gameId] = score; window.localStorage.setItem(PEAK_SCORE_STORAGE_KEY, JSON.stringify(values)); } catch { /* Non-critical persistence. */ } }
-function getRecommendation(game, priorityReasons, liveSignal, gameScore) {
-  const reason = liveSignal?.reason || priorityReasons[0] || (game.isMajorEvent ? 'Major event' : null);
-  if (game.status === 'final') return gameScore >= 75 ? ['WATCH THE REPLAY', reason || 'High-value game'] : [null, reason];
-  if (gameScore >= 90) return ['WATCH THIS', reason || 'Exceptional game value'];
-  if (gameScore >= 75) return ['WORTH WATCHING', reason || 'Strong game value'];
-  if (gameScore >= 60) return ['KEEP AN EYE ON IT', reason || 'Things could get interesting'];
-  if (gameScore >= 40) return ['WATCH IF YOU’RE FREE', reason || 'Some upside, but not essential'];
-  if (gameScore >= 25) return ['OPTIONAL', reason || 'Worth a look if it fits your schedule'];
-  return [null, reason];
+function getWhyItMatters(game, priorityReasons, liveSignal, gameScore) {
+  const primary = liveSignal?.reason || priorityReasons[0] || (game.isMajorEvent ? 'Major event' : null);
+  const secondary = priorityReasons.find((reason) => reason !== primary) || (gameScore >= 75 ? 'High Game Score' : null);
+  return [primary, secondary].filter(Boolean).slice(0, 2);
 }
 
 export function GameCard({ game, compact = false, onOpen }) {
@@ -48,7 +43,7 @@ export function GameCard({ game, compact = false, onOpen }) {
   const homeScore = scoreFor(game, 'home');
   const hasScore = (isLive || isFinal) && (awayScore != null || homeScore != null);
   const meta = formatScoreboardMeta(game);
-  const [recommendation, recommendationReason] = getRecommendation(game, priorityReasons, liveSignal, gameScore);
+  const whyItMatters = getWhyItMatters(game, priorityReasons, liveSignal, gameScore);
 
   useEffect(() => {
     if (!game.id || !Number.isFinite(currentGameScore)) return;
@@ -74,7 +69,7 @@ export function GameCard({ game, compact = false, onOpen }) {
         <div className="game-card-vs" aria-hidden="true">{hasScore ? (meta || (isLive ? 'LIVE' : 'FINAL')) : 'at'}</div>
         <div className={`game-card-team ${isFinal && awayScore != null && homeScore != null && homeScore > awayScore ? 'winner' : ''}`}><TeamMark team={home} size={compact ? 'medium' : 'large'} /><span>{teamLabel(home, game.leagueId)}</span>{hasScore && <strong>{homeScore ?? '—'}</strong>}</div>
       </div>
-      {!compact && (recommendation || recommendationReason) && <footer className="game-card-insight"><span>RECOMMENDATION</span><div>{recommendation && <strong>{recommendation}</strong>}{recommendationReason && <small>{recommendationReason}</small>}</div></footer>}
+      {!compact && whyItMatters.length > 0 && <footer className="game-card-insight"><span>WHY IT MATTERS</span><div>{whyItMatters.map((reason, index) => <small key={`${reason}-${index}`}>{reason}</small>)}</div></footer>}
     </button>
   );
 }
