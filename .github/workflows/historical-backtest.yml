@@ -1,6 +1,16 @@
 name: Historical Game Score Backtest
 
 on:
+  # Automatically run the backtest on main whenever the scoring/backtest code changes.
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/historical-backtest.mjs'
+      - 'src/sports/game-score.js'
+      - 'src/sports/historical-calibration.js'
+      - '.github/workflows/historical-backtest.yml'
+  # Keep manual dispatch available for custom year ranges when needed.
   workflow_dispatch:
     inputs:
       start_year:
@@ -11,11 +21,6 @@ on:
         description: Last calendar year to include
         required: false
         default: '2025'
-  push:
-    paths:
-      - 'scripts/historical-backtest.mjs'
-      - 'src/sports/game-score.js'
-      - 'src/sports/historical-calibration.js'
 
 jobs:
   backtest:
