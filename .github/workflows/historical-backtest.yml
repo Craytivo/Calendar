@@ -2,6 +2,7 @@ name: Historical Game Score Backtest
 
 on:
   # Automatically run the backtest on main whenever the scoring/backtest code changes.
+  # This comment intentionally keeps the workflow in the automatic-trigger path.
   push:
     branches:
       - main
