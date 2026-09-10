@@ -1,5 +1,5 @@
 import { THESPORTSDB_LEAGUES } from '../src/sports/adapters/thesportsdb.js';
-import { favoriteTeamIds, fetchEspnLeagueWindow, fetchEspnTeamWindow } from '../src/sports/adapters/espn-schedules-with-odds.js';
+import { favoriteTeamIds, fetchEspnLeagueWindow, fetchEspnTeamWindow } from '../src/sports/adapters/espn-schedules.js';
 import { enrichGamesWithEspnStandings } from '../src/sports/adapters/espn-standings.js';
 import { applyDomesticSoccerRaceContext } from '../src/sports/adapters/soccer-context.js';
 
