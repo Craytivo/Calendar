@@ -14,13 +14,27 @@ const CONFIG = {
   ucl: { sport: 'soccer', league: 'uefa.champions' },
 };
 
+const ODDS_TIMEOUT_MS = 2500;
+const MAX_ODDS_ENRICHMENTS = 12;
+
 function eventId(game) {
   const parts = String(game?.id || '').split(':');
   return parts.length ? parts[parts.length - 1] : undefined;
 }
 
+function withTimeout(promise, timeoutMs) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => setTimeout(() => resolve(undefined), timeoutMs)),
+  ]);
+}
+
 async function enrich(games) {
-  const missing = games.filter((game) => !game.odds && CONFIG[game.leagueId] && game.status === 'scheduled');
+  // Odds are an optional Game Score input. They must never block the core
+  // schedule response, especially when a provider is slow or unavailable.
+  const missing = games
+    .filter((game) => !game.odds && CONFIG[game.leagueId] && game.status === 'scheduled')
+    .slice(0, MAX_ODDS_ENRICHMENTS);
   const output = new Map(games.map((game) => [game.id, game]));
   const concurrency = 6;
 
@@ -28,13 +42,13 @@ async function enrich(games) {
     const batch = missing.slice(i, i + concurrency);
     const results = await Promise.all(batch.map((game) => {
       const id = eventId(game);
-      return fetchEspnEventOdds({
+      return withTimeout(fetchEspnEventOdds({
         ...CONFIG[game.leagueId],
         eventId: id,
         competitionId: game.competitionId || id,
         homeTeamId: game.homeTeamId,
         awayTeamId: game.awayTeamId,
-      });
+      }), ODDS_TIMEOUT_MS);
     }));
     batch.forEach((game, index) => {
       if (results[index]) output.set(game.id, { ...game, odds: results[index] });
