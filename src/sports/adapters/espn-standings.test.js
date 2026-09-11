@@ -9,15 +9,30 @@ export async function runEspnStandingsChecks() {
   globalThis.fetch = async (url) => {
     fetchCount += 1;
     const text = String(url);
-    assert(text.includes('/apis/v2/sports/'), 'standings adapter should use ESPN public v2 standings');
-    if (text.includes('/football/nfl/')) return new Response(JSON.stringify({ groups: [{ name: 'AFC West', abbreviation: 'AFCW', entries: [
+    if (text.includes('/football/nfl/standings')) return new Response(JSON.stringify({ groups: [{ name: 'AFC West', abbreviation: 'AFCW', entries: [
       { team: { id: '1', displayName: 'Kansas City Chiefs', abbreviation: 'KC' }, stats: [stat('wins', 10), stat('losses', 3), stat('winPercent', 0.769)] },
       { team: { id: '2', displayName: 'Denver Broncos', abbreviation: 'DEN' }, stats: [stat('wins', 9), stat('losses', 4), stat('winPercent', 0.692)] },
     ] }] }), { status: 200 });
-    if (text.includes('/basketball/nba/')) return new Response(JSON.stringify({ groups: [{ name: 'Western Conference', abbreviation: 'West', entries: [
+    if (text.includes('/basketball/nba/standings')) return new Response(JSON.stringify({ groups: [{ name: 'Western Conference', abbreviation: 'West', entries: [
       { team: { id: '3', displayName: 'Sacramento Kings', abbreviation: 'SAC' }, stats: [stat('wins', 12), stat('losses', 3), stat('winPercent', 0.8), stat('rank', 5)] },
       { team: { id: '4', displayName: 'Denver Nuggets', abbreviation: 'DEN' }, stats: [stat('wins', 11), stat('losses', 4), stat('winPercent', 0.733), stat('rank', 6)] },
     ] }] }), { status: 200 });
+    if (text.includes('/baseball/mlb/standings')) return new Response(JSON.stringify({ groups: [{ name: 'American League', abbreviation: 'AL', entries: [
+      { team: { id: '10', displayName: 'New York Yankees', abbreviation: 'NYY' }, stats: [stat('wins', 82), stat('losses', 65), stat('winPercent', 0.558), stat('rank', 3), stat('runDifferential', 54)] },
+      { team: { id: '11', displayName: 'Boston Red Sox', abbreviation: 'BOS' }, stats: [stat('wins', 78), stat('losses', 69), stat('winPercent', 0.531), stat('rank', 6), stat('runDifferential', 12)] },
+    ] }] }), { status: 200 });
+    if (text.includes('/baseball/mlb/teams/10/record')) return new Response(JSON.stringify({ items: [
+      { type: 'total', summary: '82-65', value: 0.558 },
+      { type: 'home', summary: '44-29', value: 0.603 },
+      { type: 'away', summary: '38-36', value: 0.514 },
+      { type: 'last10', summary: '7-3', value: 0.7 },
+    ] }), { status: 200 });
+    if (text.includes('/baseball/mlb/teams/11/record')) return new Response(JSON.stringify({ items: [
+      { type: 'total', summary: '78-69', value: 0.531 },
+      { type: 'home', summary: '43-31', value: 0.581 },
+      { type: 'away', summary: '35-38', value: 0.479 },
+      { type: 'last10', summary: '5-5', value: 0.5 },
+    ] }), { status: 200 });
     throw new Error(`Unexpected standings URL: ${text}`);
   };
 
@@ -36,6 +51,13 @@ export async function runEspnStandingsChecks() {
   assert(nba[0].homeTeam.conferenceRank === 5, 'NBA conference rank should be normalized');
   assert(nba[0].homeTeam.gamesPlayed === 15, 'NBA games played should be derived');
   assert(nba[0].hasPlayoffImplications === false, 'early-season NBA game should not be marked playoff-relevant by cutoff alone');
+
+  const mlb = await enrichGamesWithEspnStandings([{ id: 'mlb-test', leagueId: 'mlb', startTime: '2026-09-20T23:00:00.000Z', status: 'scheduled', eventType: 'regular-season', homeTeam: { id: 'tsdb:mlb:10', name: 'New York Yankees', leagueId: 'mlb' }, awayTeam: { id: 'tsdb:mlb:11', name: 'Boston Red Sox', leagueId: 'mlb' } }]);
+  assert(mlb[0].homeTeam.runDifferential === 54, 'MLB run differential should be normalized');
+  assert(mlb[0].homeTeam.homeWins === 44 && mlb[0].homeTeam.homeLosses === 29, 'MLB home record should be normalized');
+  assert(mlb[0].awayTeam.awayWins === 35 && mlb[0].awayTeam.awayLosses === 38, 'MLB away record should be normalized');
+  assert(mlb[0].homeTeam.lastTenWins === 7 && mlb[0].homeTeam.lastTenLosses === 3, 'MLB last-ten record should be normalized');
+  assert(mlb[0].awayTeam.lastTenWins === 5 && mlb[0].awayTeam.lastTenLosses === 5, 'MLB away last-ten record should be normalized');
 
   globalThis.fetch = originalFetch;
   return true;
