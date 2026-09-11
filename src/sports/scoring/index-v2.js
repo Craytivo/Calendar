@@ -8,6 +8,7 @@ import { scoreForm } from './form.js';
 import { scorePersonal } from './personal.js';
 import { scoreDataCompleteness } from './data-completeness.js';
 import { getWatchTier } from './tiers.js';
+import { getConfidenceAdjustedScore, getPriorityFloor } from './confidence.js';
 
 const mustSeeTeamIds = new Set(teams.filter((team) => team.favoriteTier === 'must-see').map((team) => team.id));
 
@@ -19,14 +20,38 @@ export function scoreGameV2(game) {
   const form = scoreForm(game);
   const personal = scorePersonal(game, favoriteTeamIds, mustSeeTeamIds);
   const dataCompleteness = scoreDataCompleteness(game);
-  const total = Math.round(competitive.score + stakes.score + teamQuality.score + narrative.score + form.score + personal.score);
-  const weightedConfidence = (competitive.confidence * 25 + stakes.confidence * 25 + teamQuality.confidence * 15 + narrative.confidence * 10 + form.confidence * 10 + personal.confidence * 15) / 100;
+
+  const rawTotal = Math.round(
+    competitive.score +
+    stakes.score +
+    teamQuality.score +
+    narrative.score +
+    form.score +
+    personal.score,
+  );
+
+  const weightedConfidence = (
+    competitive.confidence * 25 +
+    stakes.confidence * 25 +
+    teamQuality.confidence * 15 +
+    narrative.confidence * 10 +
+    form.confidence * 10 +
+    personal.confidence * 15
+  ) / 100;
+
   const confidence = Number(Math.min(weightedConfidence, dataCompleteness.confidence).toFixed(2));
+  const confidenceAdjustedTotal = getConfidenceAdjustedScore(rawTotal, confidence);
+  const priorityFloor = getPriorityFloor({ stakes, narrative, personal });
+  const total = Math.max(confidenceAdjustedTotal, priorityFloor.minScore);
+  const boundedTotal = Math.max(0, Math.min(100, total));
 
   return {
-    total: Math.max(0, Math.min(100, total)),
-    tier: getWatchTier(total).label,
-    breakdown: { competitive, stakes, teamQuality, narrative, form, personal, dataCompleteness },
+    total: boundedTotal,
+    rawTotal: Math.max(0, Math.min(100, rawTotal)),
+    confidenceAdjustedTotal,
+    tier: getWatchTier(boundedTotal).label,
     confidence,
+    priorityFloor,
+    breakdown: { competitive, stakes, teamQuality, narrative, form, personal, dataCompleteness },
   };
 }
