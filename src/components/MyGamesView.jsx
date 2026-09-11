@@ -30,12 +30,10 @@ function compareGames(a, b) {
   const aLive = a.status === 'live';
   const bLive = b.status === 'live';
   if (aLive !== bLive) return Number(bLive) - Number(aLive);
-
   if (aLive && bLive) {
     const liveDifference = getLiveSignalRank(a) - getLiveSignalRank(b);
     if (liveDifference !== 0) return liveDifference;
   }
-
   const scoreDifference = priorityScore(b) - priorityScore(a);
   if (scoreDifference !== 0) return scoreDifference;
   return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
@@ -45,27 +43,27 @@ function chronological(a, b) {
   return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
 }
 
-function Section({ title, games, emptyMessage, onOpenGame, featured = false }) {
+function CardGrid({ games, onOpenGame, signal = false }) {
   return (
-    <section className={`my-games-section ${featured ? 'featured-section' : ''}`}>
-      <div className="my-games-section-heading">
-        <div className="section-heading-copy">
-          <h2>{title}</h2>
-          {featured && <span className="section-heading-rule" aria-hidden="true" />}
+    <div className={`my-games-cards ${signal ? 'signal-grid' : 'standard-grid'}`}>
+      {games.map((game, index) => (
+        <div className={`game-card-slot ${signal && index === 0 ? 'lead-slot' : ''}`} key={game.id}>
+          <GameCard game={game} onOpen={onOpenGame} />
         </div>
+      ))}
+    </div>
+  );
+}
+
+function Section({ title, games, emptyMessage, onOpenGame, signal = false }) {
+  return (
+    <section className={`my-games-section ${signal ? 'signal-section' : ''}`}>
+      <div className="my-games-section-heading">
+        <h2>{title}</h2>
         {games.length > 0 && <span className="section-count">{games.length}</span>}
       </div>
       {games.length > 0
-        ? <div className={`my-games-cards ${featured ? 'worth-watching-cards' : ''}`}>
-            {games.map((game, index) => (
-              <GameCard
-                key={game.id}
-                game={game}
-                featured={featured && index === 0}
-                onOpen={onOpenGame}
-              />
-            ))}
-          </div>
+        ? <CardGrid games={games} onOpenGame={onOpenGame} signal={signal} />
         : <div className="section-empty">{emptyMessage}</div>}
     </section>
   );
@@ -85,9 +83,7 @@ function AllGamesSection({ games, onOpenGame }) {
   return (
     <section className="my-games-section all-games-section">
       <div className="my-games-section-heading">
-        <div className="section-heading-copy">
-          <h2>All Games</h2>
-        </div>
+        <h2>All Games</h2>
         <span className="section-count">{games.length}</span>
       </div>
       <div className="all-games-days">
@@ -96,9 +92,7 @@ function AllGamesSection({ games, onOpenGame }) {
             <div className="all-games-day-heading">
               {new Date(`${key}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
             </div>
-            <div className="my-games-cards">
-              {dayGames.map((game) => <GameCard key={game.id} game={game} onOpen={onOpenGame} />)}
-            </div>
+            <CardGrid games={dayGames} onOpenGame={onOpenGame} />
           </div>
         ))}
       </div>
@@ -115,11 +109,9 @@ export function MyGamesView({ games, now, onOpenGame }) {
       const time = new Date(game.startTime).getTime();
       return time >= start.getTime() && time < end.getTime();
     });
-
   }, [games, now]);
 
   const worthWatching = useMemo(() => [...windowGames].sort(compareGames).slice(0, SECTION_LIMIT), [windowGames]);
-
   const yourNextGames = useMemo(() => [...windowGames]
     .filter(isFavoriteGame)
     .filter((game) => new Date(game.startTime).getTime() >= new Date(now).getTime() || game.status === 'live')
@@ -132,21 +124,8 @@ export function MyGamesView({ games, now, onOpenGame }) {
 
   return (
     <div className="my-games-list">
-      <Section
-        title="Worth Watching"
-        games={worthWatching}
-        onOpenGame={onOpenGame}
-        featured
-        emptyMessage="No games are currently ranked in your scope."
-      />
-
-      <Section
-        title="Your Teams"
-        games={yourNextGames}
-        onOpenGame={onOpenGame}
-        emptyMessage="None of your favorite teams play in the next seven days."
-      />
-
+      <Section title="Worth Watching" games={worthWatching} onOpenGame={onOpenGame} signal emptyMessage="No games are currently ranked in your scope." />
+      <Section title="Your Teams" games={yourNextGames} onOpenGame={onOpenGame} emptyMessage="None of your favorite teams play in the next seven days." />
       <AllGamesSection games={windowGames} onOpenGame={onOpenGame} />
     </div>
   );
