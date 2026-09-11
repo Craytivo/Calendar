@@ -40,6 +40,7 @@ function getWhyItMatters(game, scoring, priorityReasons, liveSignal, gameScore) 
   const secondary = secondaryPool.find((reason) => reason && reason !== primary) || (gameScore >= 75 ? 'High Game Score' : null);
   return [primary, secondary].filter(Boolean).slice(0, 2);
 }
+function priorityClass(tier) { return `priority-${String(tier || '').toLowerCase().replace(/\s+/g, '-')}`; }
 
 export function GameCard({ game, compact = false, onOpen }) {
   const league = leagues.find((item) => item.id === game.leagueId);
@@ -76,12 +77,12 @@ export function GameCard({ game, compact = false, onOpen }) {
   }, [game.id, currentGameScore, peakScore]);
 
   return (
-    <button type="button" className={`game-card ${compact ? 'compact' : ''} ${isLive ? 'live' : ''} ${isFinal ? 'final' : ''} ${isStartingSoon ? 'starting-soon' : ''} ${isFavorite ? 'favorite-team-card' : ''} score-${gameScoreLevel.toLowerCase()} accent-${game.leagueId === 'nba' || game.leagueId === 'epl' || game.leagueId === 'ucl' ? 'blue' : game.leagueId === 'mlb' || game.leagueId === 'ncaa-football' ? 'green' : game.leagueId === 'nhl' || game.leagueId === 'laliga' ? 'red' : 'neutral'}`} onClick={() => onOpen?.(game)} aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}, Priority ${priorityScore}, ${priorityTier}`} data-priority-score={priorityScore} data-score={priorityScore} data-raw-score={rawPriorityScore} data-confidence-adjusted-score={confidenceAdjustedPriority} data-confidence={priorityConfidence} data-score-tier={priorityTier} data-game-score={gameScore}>
+    <button type="button" className={`game-card ${compact ? 'compact' : ''} ${isLive ? 'live' : ''} ${isFinal ? 'final' : ''} ${isStartingSoon ? 'starting-soon' : ''} ${isFavorite ? 'favorite-team-card' : ''} ${priorityClass(priorityTier)} accent-${game.leagueId === 'nba' || game.leagueId === 'epl' || game.leagueId === 'ucl' ? 'blue' : game.leagueId === 'mlb' || game.leagueId === 'ncaa-football' ? 'green' : game.leagueId === 'nhl' || game.leagueId === 'laliga' ? 'red' : 'neutral'}`} onClick={() => onOpen?.(game)} aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}, Priority ${priorityScore}, ${priorityTier}`} data-priority-score={priorityScore} data-score={priorityScore} data-raw-score={rawPriorityScore} data-confidence-adjusted-score={confidenceAdjustedPriority} data-confidence={priorityConfidence} data-score-tier={priorityTier} data-game-score={gameScore}>
       <header className="game-card-header">
         <span className="game-card-league">{league?.shortName || game.leagueId.toUpperCase()}</span>
         <div className="game-card-header-meta">
-          <span className="game-card-score" title={`Priority ${priorityScore} · ${priorityTier}${lowConfidence ? ` · ${Math.round(priorityConfidence * 100)}% confidence` : ''}`} aria-label={`Priority ${priorityScore}, ${priorityTier}${lowConfidence ? `, ${Math.round(priorityConfidence * 100)}% confidence` : ''}`}><strong>{priorityScore}</strong><small>Priority</small></span>
-          {isLive && <span className="game-card-score game-card-live-score" title={`Live Game Score ${gameScore} · ${gameScoreLevel}`} aria-label={`Live Game Score ${gameScore}, ${gameScoreLevel}`}><strong>{gameScore}</strong><small>Live</small></span>}
+          <span className="game-card-score" title={`Priority ${priorityScore} · ${priorityTier}${lowConfidence ? ` · ${Math.round(priorityConfidence * 100)}% confidence` : ''}`} aria-label={`Priority ${priorityScore}, ${priorityTier}${lowConfidence ? `, ${Math.round(priorityConfidence * 100)}% confidence` : ''}`}><strong>{priorityScore}</strong><small>{priorityTier}</small></span>
+          {isLive && <span className={`game-card-score game-card-live-score score-${gameScoreLevel.toLowerCase()}`} title={`Live Game Score ${gameScore} · ${gameScoreLevel}`} aria-label={`Live Game Score ${gameScore}, ${gameScoreLevel}`}><strong>{gameScore}</strong><small>Live</small></span>}
           {isStartingSoon && !isLive && <Clock3 size={12} aria-hidden="true" />}
           {isLive && <span className="game-card-live-dot" aria-hidden="true" />}
           <span className="game-card-time">{statusLabel(game, isStartingSoon)}</span>
@@ -93,7 +94,7 @@ export function GameCard({ game, compact = false, onOpen }) {
         <div className="game-card-vs" aria-hidden="true">{hasScore ? (meta || (isLive ? 'LIVE' : 'FINAL')) : 'at'}</div>
         <div className={`game-card-team ${isFinal && awayScore != null && homeScore != null && homeScore > awayScore ? 'winner' : ''}`}><TeamMark team={home} size={compact ? 'medium' : 'large'} /><span>{teamLabel(home, game.leagueId)}</span>{hasScore && <strong>{homeScore ?? '—'}</strong>}</div>
       </div>
-      {!compact && whyItMatters.length > 0 && <footer className="game-card-insight"><span>WHY IT MATTERS</span><div>{whyItMatters.map((reason, index) => <small key={`${reason}-${index}`}>{reason}</small>)}</div></footer>}
+      {!compact && whyItMatters.length > 0 && <footer className="game-card-insight"><span>SIGNAL</span><div>{whyItMatters.map((reason, index) => <small key={`${reason}-${index}`}>{reason}</small>)}</div></footer>}
     </button>
   );
 }
