@@ -9,6 +9,7 @@ const FIELD_SPORTS = new Set(['nfl', 'nba', 'ncaa-football', 'nhl']);
 function number(value) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : undefined; }
 function scoreFor(game, side) { const value = side === 'away' ? game?.awayScore ?? game?.awayTeam?.score : game?.homeScore ?? game?.homeTeam?.score; return number(value); }
 function difference(game) { const away = scoreFor(game, 'away'); const home = scoreFor(game, 'home'); return away === undefined || home === undefined ? undefined : Math.abs(away - home); }
+function signedDifference(game) { const away = scoreFor(game, 'away'); const home = scoreFor(game, 'home'); return away === undefined || home === undefined ? undefined : home - away; }
 function totalPoints(game) { const away = scoreFor(game, 'away'); const home = scoreFor(game, 'home'); return away === undefined || home === undefined ? undefined : away + home; }
 function isFavorite(game) { return favoriteTeamIds.has(game?.homeTeamId) || favoriteTeamIds.has(game?.awayTeamId); }
 function isOvertime(game) { return game?.isOvertime === true || game?.overtime === true || /overtime|extra time|aet/.test(String(game?.statusDetail ?? game?.shortDetail ?? '').toLowerCase()); }
@@ -119,6 +120,43 @@ function baseInterest(game) {
   return 4;
 }
 
+function liveProgress(game) {
+  const sport = game?.leagueId;
+  const period = number(game?.period);
+  const clock = number(game?.clockSeconds);
+  if (period === undefined) return undefined;
+  if (SOCCER.has(sport)) return clock === undefined ? Math.min(0.95, period / 2) : Math.min(0.99, clock / (90 * 60));
+  if (sport === 'mlb') return Math.min(0.99, period / 9);
+  const periods = sport === 'nfl' || sport === 'ncaa-football' ? 4 : 4;
+  return Math.min(0.99, period / periods);
+}
+
+function scoringPaceBonus(game) {
+  if (game?.status !== 'live') return 0;
+  const market = getSportMarketContext(game);
+  const expectedTotal = number(game?.odds?.total ?? game?.bettingOdds?.total ?? game?.market?.total);
+  const total = totalPoints(game);
+  const progress = liveProgress(game);
+  if (!market.available || expectedTotal === undefined || total === undefined || progress === undefined || progress < 0.12) return 0;
+  const projectedTotal = total / progress;
+  if (projectedTotal >= expectedTotal * 1.25) return 10;
+  if (projectedTotal >= expectedTotal * 1.12) return 6;
+  return 0;
+}
+
+function upsetBonus(game) {
+  if (game?.status !== 'live') return 0;
+  const spread = number(game?.odds?.spread ?? game?.bettingOdds?.spread ?? game?.market?.spread);
+  const actualMargin = signedDifference(game);
+  if (spread === undefined || actualMargin === undefined) return 0;
+  const expectedHomeMargin = -spread;
+  const surprise = actualMargin - expectedHomeMargin;
+  if (surprise >= 14) return 12;
+  if (surprise >= 8) return 8;
+  if (surprise >= 4) return 4;
+  return 0;
+}
+
 export function getGameScoreSignals(game) {
   const market = getSportMarketContext(game);
   const priority = getPriorityScore(game);
@@ -132,6 +170,8 @@ export function getGameScoreSignals(game) {
     implications: (game?.hasPlayoffImplications || game?.hasSeedingImplications || game?.hasQualificationImplications) ? 1 : 0,
     baseInterest: baseInterest(game),
     marketExcitement: market.available ? market.contribution : 0,
+    scoringPace: scoringPaceBonus(game),
+    upset: upsetBonus(game),
   };
 }
 
@@ -142,6 +182,11 @@ export function getRawGameScore(game) {
   const market = game?.status !== 'live' && game?.status !== 'final'
     ? getSportMarketScore(game)
     : 0;
+  if (game?.status === 'live') {
+    // Once a game is underway, observed drama matters more than pregame reputation.
+    // Personal relevance remains meaningful, but cannot overwhelm an objectively exciting game.
+    return Math.min(100, Math.round(personal * 0.35 + drama + base + scoringPaceBonus(game) + upsetBonus(game)));
+  }
   return Math.min(100, Math.round(personal + drama + base + market));
 }
 
@@ -150,8 +195,6 @@ export function getGameScore(game, { peakScore } = {}) {
   const raw = getRawGameScore(game);
   const calibrated = calibrateGameScore(raw, game?.leagueId);
   if (game.status === 'final' && Number.isFinite(Number(peakScore))) {
-    // peakScore is already a displayed/calibrated score persisted by the client.
-    // Do not run it through the calibration curve a second time.
     return Math.min(100, Math.max(calibrated, Number(peakScore)));
   }
   return calibrated;
@@ -178,6 +221,8 @@ export function getGameScoreReasons(game) {
     const clock = number(game?.clockSeconds);
     if (SOCCER.has(game?.leagueId) && clock !== undefined && clock >= 80 * 60) reasons.push('Late in the match');
     else if (!SOCCER.has(game?.leagueId) && clock !== undefined && clock <= 120) reasons.push('Final minutes');
+    if (scoringPaceBonus(game) > 0) reasons.push('Scoring at a high pace');
+    if (upsetBonus(game) > 0) reasons.push('Upset developing');
   }
   if (game?.status === 'final') {
     if (difference(game) === 0) reasons.push('Tied at the end');
@@ -209,5 +254,7 @@ export function getGameScoreComponents(game) {
     marketExcitement: market.available ? Math.round(market.contribution) : 0,
     marketCompetitiveness: market.available ? market.competitivenessScore : 0,
     marketScoringEnvironment: market.available ? market.scoringEnvironmentScore : 0,
+    scoringPace: Math.round(scoringPaceBonus(game)),
+    upset: Math.round(upsetBonus(game)),
   };
 }
