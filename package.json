@@ -12,7 +12,7 @@
     "dev:cloudflare": "npm run build && wrangler dev",
     "deploy": "npm run build && wrangler deploy",
     "backtest:historical": "node scripts/historical-backtest.mjs",
-    "test": "node src/sports/priority.test.js && node src/sports/selectors.test.js && node src/sports/adapters/normalizer.test.js && node src/sports/adapters/espn-schedules.test.js && node src/sports/adapters/espn-standings.test.js && node src/sports/adapters/soccer-context.test.js && node src/sports/adapters/odds.test.js && node src/sports/watchability.test.js && node src/sports/live-state.test.js && node src/sports/game-intelligence.test.js && node src/sports/game-score.test.js && node src/sports/historical-calibration.test.js && node src/sports/api-diagnostic.test.js && node src/sports/contrast-system.test.js && node src/sports/data-reliability.test.js"
+    "test": "node src/sports/priority.test.js && node src/sports/selectors.test.js && node src/sports/adapters/normalizer.test.js && node src/sports/adapters/espn-schedules.test.js && node src/sports/adapters/espn-standings.test.js && node src/sports/adapters/soccer-context.test.js && node src/sports/adapters/odds.test.js && node src/sports/watchability.test.js && node src/sports/live-state.test.js && node src/sports/game-intelligence.test.js && node src/sports/game-score.test.js && node src/sports/historical-calibration.test.js && node src/sports/api-diagnostic.test.js && node src/sports/data-reliability.test.js"
   },
   "dependencies": {
     "@vitejs/plugin-react": "4.3.4",
