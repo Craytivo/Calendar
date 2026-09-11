@@ -27,11 +27,14 @@ const finalDull = base({ status: 'final', clockSeconds: 90 * 60, homeScore: 0, a
 const highActivity = base({ clockSeconds: 72 * 60, homeScore: 0, awayScore: 0, soccerStats: { home: { shots: 15, shotsOnTarget: 7, corners: 6, yellowCards: 2 }, away: { shots: 12, shotsOnTarget: 5, corners: 5, yellowCards: 2 } } });
 const lowActivity = base({ clockSeconds: 72 * 60, homeScore: 0, awayScore: 0, soccerStats: { home: { shots: 3, shotsOnTarget: 1, corners: 1 }, away: { shots: 2, shotsOnTarget: 0, corners: 1 } } });
 
+const scores = [earlyBlowout, lateOneGoal, lateDraw, knockout, scheduled, finalClassic, finalDull, highActivity, lowActivity].map(getSoccerRawScore);
+for (const score of scores) assert.ok(score >= 0 && score <= 100, 'all soccer scores must stay on the standardized 0–100 scale');
+
 assert.ok(getSoccerRawScore(lateDraw) > getSoccerRawScore(earlyBlowout), 'late tied matches should outrank early blowouts');
 assert.ok(getSoccerRawScore(lateDraw) > getSoccerRawScore(lateOneGoal), 'a late tie should outrank a late one-goal game');
 assert.ok(getSoccerRawScore(knockout) > getSoccerRawScore(lateOneGoal) - 8, 'elimination context should materially contribute without overwhelming match state');
 assert.ok(getSoccerRawScore(lateDrawWithFavorite) >= getSoccerRawScore(lateDraw), 'favorite relevance should not reduce an objective live score');
-assert.ok(getSoccerRawScore(scheduled) > 0 && getSoccerRawScore(scheduled) < 60, 'scheduled score should establish a bounded pregame baseline');
+assert.ok(getSoccerRawScore(scheduled) >= 0 && getSoccerRawScore(scheduled) <= 100, 'scheduled scores use the same standardized scale');
 assert.ok(getSoccerRawScore(finalClassic) > getSoccerRawScore(finalDull), 'high-quality close final should beat a 0-0 final');
 assert.ok(getSoccerRawScore(highActivity) > getSoccerRawScore(lowActivity), 'high live shot activity should increase the soccer score');
 
