@@ -3,6 +3,15 @@ import { CalendarDays, MapPin, Radio, Tv, X } from 'lucide-react';
 import { TeamMark, getDisplayTeamName } from './TeamMark.jsx';
 import './GameDetailModal.css';
 
+const COMPONENT_LABELS = {
+  competitive: 'Competition',
+  teamQuality: 'Team quality',
+  stakes: 'Stakes',
+  narrative: 'Narrative',
+  form: 'Form',
+  personal: 'Personal',
+};
+
 function formatCountdown(milliseconds) {
   const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
   const days = Math.floor(totalSeconds / 86400);
@@ -73,13 +82,15 @@ export function GameDetailModal({ game, onClose }) {
     game.details.venue ? { label: 'Venue', value: game.details.venue, icon: MapPin } : null,
     game.details.network ? { label: 'Watch', value: game.details.network, icon: Tv } : null,
   ].filter(Boolean);
+  const components = Object.entries(game.v2.components)
+    .sort(([, a], [, b]) => Number(b.contribution ?? 0) - Number(a.contribution ?? 0));
 
   return (
     <div className="game-detail-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <div className={`game-detail-modal ${isLive ? 'is-live' : ''} ${isFinal ? 'is-final' : ''}`} role="dialog" aria-modal="true" aria-labelledby="game-detail-title">
         <div className="game-detail-hero">
           <header className="game-detail-header">
-            <div className="game-detail-league"><span className="game-detail-eyebrow">{game.league.abbreviation}</span></div>
+            <div><span className="game-detail-eyebrow">{game.league.name}</span><h2 id="game-detail-title">{getDisplayTeamName(away)} at {getDisplayTeamName(home)}</h2></div>
             <button type="button" className="icon-button game-detail-close" onClick={onClose} aria-label="Close game details"><X size={18} /></button>
           </header>
 
@@ -88,7 +99,7 @@ export function GameDetailModal({ game, onClose }) {
               {isLive ? <span className="game-detail-live-dot" /> : <span className="game-detail-status-mark" />}
               {statusLabel(game.status.state)}
             </span>
-            <span className="game-detail-watch"><strong>{game.v2.total}</strong><span>{game.v2.tier.label}</span></span>
+            <div className="game-detail-score-summary"><strong>{game.v2.total}</strong><span>{game.v2.tier.label}</span><small>{Math.round(game.v2.confidence * 100)}% data confidence</small></div>
           </div>
 
           {(isLive || isFinal) ? (
@@ -105,29 +116,37 @@ export function GameDetailModal({ game, onClose }) {
             </div>
           )}
 
-          <div className="game-detail-watchline">
-            <div><span>Priority</span><strong>{game.v2.total} · {game.v2.tier.label}</strong></div>
-            <div><span>Confidence</span><strong>{Math.round(game.v2.confidence * 100)}%</strong></div>
-            {isLive && <div><span>Live Game Score</span><strong>{game.live.score} · {game.live.level}</strong></div>}
-            {isLive && game.live.reasons.length > 0 && <div className="game-detail-watch-reasons">{game.live.reasons.map((reason) => <span key={reason}>{reason}</span>)}</div>}
-          </div>
-
-          <div className="game-detail-storyline">
-            <div>
-              <span>Why this matters</span>
-              <strong>{game.explanation.summary || 'This game is being surfaced based on its GameScore V2 profile.'}</strong>
-              <div className="game-detail-reasons">
-                {[game.explanation.primary, game.explanation.secondary].filter(Boolean).map((reason) => <span key={reason}>{reason}</span>)}
-              </div>
+          <section className="game-detail-intelligence">
+            <div className="game-detail-section-heading">
+              <span>WHY IT RANKS HERE</span>
+              <strong>{game.explanation.primary || 'V2 composite ranking'}</strong>
             </div>
-          </div>
+            {game.explanation.secondary && <p className="game-detail-summary">{game.explanation.secondary}</p>}
+            <div className="game-detail-components" aria-label="GameScore V2 component contributions">
+              {components.map(([id, component]) => (
+                <div className="game-detail-component" key={id}>
+                  <div className="game-detail-component-topline"><span>{COMPONENT_LABELS[id]}</span><strong>+{Math.round(Number(component.contribution ?? 0))}</strong></div>
+                  <div className="game-detail-component-track" aria-hidden="true"><span style={{ width: `${component.contributionPercent ?? 0}%` }} /></div>
+                  {component.reasons?.[0] && <small>{component.reasons[0]}</small>}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {isLive && game.live.score != null && (
+            <section className="game-detail-live-panel">
+              <div><span><Radio size={14} /> Live watchability</span><strong>{game.live.score}</strong></div>
+              {game.live.level && <small>{game.live.level}</small>}
+              {game.live.reasons?.length > 0 && <p>{game.live.reasons.slice(0, 2).join(' · ')}</p>}
+            </section>
+          )}
         </div>
 
         <div className="game-detail-content">
           <div className="game-detail-info">
             {meta.map(({ label, value, icon: Icon }) => <div className="game-detail-info-row" key={label}><span className="game-detail-info-label">{Icon ? <Icon size={15} /> : <span className="detail-dot" />}{label}</span><strong>{value}</strong></div>)}
           </div>
-          <div className="game-detail-live-note">{isLive ? <><Radio size={14} /> Live score updates every 30 seconds</> : isFinal ? 'Final score' : liveLabel}</div>
+          <div className="game-detail-live-note">{isLive ? 'Live score updates every 30 seconds' : liveLabel}</div>
         </div>
       </div>
     </div>
