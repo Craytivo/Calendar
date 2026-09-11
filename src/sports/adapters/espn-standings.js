@@ -31,8 +31,14 @@ function normalizeEntry(entry, group) {
   const wins = number(stat(entry, ['wins', 'win'])), losses = number(stat(entry, ['losses', 'loss'])), ties = number(stat(entry, ['ties', 'tie'])) ?? 0;
   const gamesPlayed = number(stat(entry, ['gamesPlayed', 'games'])) ?? (wins !== undefined && losses !== undefined ? wins + losses + ties : undefined);
   const winPercentage = number(stat(entry, ['winPercent', 'winPct', 'winningPercentage', 'winpercentage'])) ?? (wins !== undefined && gamesPlayed ? (wins + ties * 0.5) / gamesPlayed : undefined);
-  const rank = number(stat(entry, ['rank', 'leagueRank', 'standing', 'position'])), conferenceRank = number(stat(entry, ['conferenceRank', 'confRank', 'conferencePosition', 'playoffSeed']));
-  const playoffSeed = number(stat(entry, ['playoffSeed', 'seed'])), gamesBehind = number(stat(entry, ['gamesBehind', 'gb']));
+  const rank = number(stat(entry, ['rank', 'leagueRank', 'standing', 'position']));
+  // ESPN's NBA standings endpoint places teams inside conference groups and exposes
+  // the conference position as the entry's generic `rank` stat. Normalize that into
+  // the canonical conferenceRank field used by the rest of the scoring pipeline.
+  const isConferenceGroup = /conference/i.test(String(group?.name ?? group?.abbreviation ?? ''));
+  const conferenceRank = number(stat(entry, ['conferenceRank', 'confRank', 'conferencePosition'])) ?? (isConferenceGroup ? rank : undefined);
+  const playoffSeed = number(stat(entry, ['playoffSeed', 'seed']));
+  const gamesBehind = number(stat(entry, ['gamesBehind', 'gb']));
   return { id: canonicalId ?? `espn:${team.id ?? clean(name)}`, providerId: team.id, name, abbreviation: team.abbreviation, wins, losses, ties, gamesPlayed, winPercentage, ranking: number(stat(entry, ['apRank', 'rank', 'pollRank', 'currentRank'])) ?? number(entry.rank), leagueRank: rank, conferenceRank: conferenceRank ?? playoffSeed, playoffSeed, gamesBehind, conference: group?.abbreviation ?? group?.name, division: NFL_DIVISIONS[clean(name)] ?? group?.name, playoffStatus: clean(entry.note ?? entry.status?.name ?? entry.status?.type) };
 }
 function getEntries(payload) { return (payload?.groups ?? []).flatMap((group) => (group.entries ?? []).map((entry) => normalizeEntry(entry, group))); }
