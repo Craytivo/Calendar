@@ -1,5 +1,5 @@
 import React from 'react';
-import { getGameScore } from '../sports/game-score.js';
+import { scoreGameV2 } from '../sports/scoring/index-v2.js';
 import { GameCard } from './GameCard.jsx';
 import './NextUp.css';
 
@@ -8,7 +8,7 @@ function isFutureScheduled(game, now) {
 }
 
 function score(game) {
-  return getGameScore(game);
+  return scoreGameV2(game).total;
 }
 
 export function getNextUpGame(games, now = new Date()) {

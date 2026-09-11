@@ -1,15 +1,15 @@
 import { getPriorityReasons, getPriorityScore, getPriorityTier, isMajorGameForPriority, isMajorUclGameForPriority } from './priority.js';
-import { getGameScore } from './game-score.js';
+import { scoreGameV2 } from './scoring/index-v2.js';
 
 function localKey(value) { const date = new Date(value); return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`; }
-function rank(game) { return getGameScore(game); }
+function rank(game) { return scoreGameV2(game).total; }
 export function getGamesForDay(games, date) { const key = localKey(date); return games.filter((game) => localKey(game.startTime) === key); }
 export function getDaySummary(games, date) {
   const dayGames = getGamesForDay(games, date);
   const meaningful = dayGames.filter((game) => getPriorityTier(game) <= 5 || isMajorGameForPriority(game) || isMajorUclGameForPriority(game)).sort((a,b) => rank(b)-rank(a));
   const favorites = dayGames.filter((game) => getPriorityTier(game) <= 2);
   const live = dayGames.filter((game) => game.status === 'live');
-  const top = meaningful[0] ?? dayGames.sort((a,b) => rank(b)-rank(a))[0] ?? null;
+  const top = meaningful[0] ?? [...dayGames].sort((a,b) => rank(b)-rank(a))[0] ?? null;
   const reasons = top ? getPriorityReasons(top) : [];
   return { total: dayGames.length, meaningful: meaningful.length, favorites: favorites.length, live: live.length, topGame: top, reasons, games: meaningful.slice(0,5) };
 }
