@@ -1,24 +1,22 @@
-const clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, value));
-
-function teamStrength(team) {
+function teamStrength(team, leagueId) {
   if (!team) return null;
+  if (Number.isFinite(team.winPercentage)) return team.winPercentage;
 
-  const signals = [];
-  if (Number.isFinite(team.winPercentage)) signals.push(team.winPercentage);
-  if (Number.isFinite(team.ranking) && team.ranking >= 1 && team.ranking <= 25) {
-    signals.push(1 - (team.ranking - 1) / 24);
+  if (leagueId === 'ncaa-football' && Number.isFinite(team.ranking) && team.ranking >= 1 && team.ranking <= 25) {
+    return 1 - (team.ranking - 1) / 24;
   }
-  if (Number.isFinite(team.leagueRank) && team.leagueRank >= 1 && team.leagueRank <= 20) {
-    signals.push(1 - (team.leagueRank - 1) / 19);
+  if ((leagueId === 'epl' || leagueId === 'laliga') && Number.isFinite(team.leagueRank)) {
+    return Math.max(0, 1 - (team.leagueRank - 1) / 19);
   }
-
-  if (!signals.length) return null;
-  return signals.reduce((sum, value) => sum + value, 0) / signals.length;
+  if ((leagueId === 'nba' || leagueId === 'nhl') && Number.isFinite(team.conferenceRank)) {
+    return Math.max(0, 1 - (team.conferenceRank - 1) / 14);
+  }
+  return null;
 }
 
 export function scoreCompetitive(game) {
-  const home = teamStrength(game.homeTeam);
-  const away = teamStrength(game.awayTeam);
+  const home = teamStrength(game.homeTeam, game.leagueId);
+  const away = teamStrength(game.awayTeam, game.leagueId);
 
   if (home === null || away === null) {
     return { score: 10, max: 25, confidence: 0.35, reasons: ['Limited team-strength data'] };
