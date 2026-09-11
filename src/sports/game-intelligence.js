@@ -50,7 +50,7 @@ export function getLiveGameReasons(game) {
   if (overtime) reasons.push('Overtime');
   if (diff === 0) reasons.push('Tied game');
   else if (diff === 1) reasons.push(sport === 'mlb' ? 'One-run game' : 'One-score game');
-  else if (diff !== undefined && diff <= (sport === 'mlb' ? 2 : 7)) reasons.push('Close game');
+  else if (diff !== undefined && ((sport === 'nfl' || sport === 'ncaaf') ? diff <= 8 : diff <= (sport === 'mlb' ? 2 : 7))) reasons.push('One-score game');
   if (seconds !== undefined && ((sport === 'soccer' || sport === 'epl' || sport === 'laliga' || sport === 'ucl') ? seconds >= 80 * 60 : seconds <= 120)) reasons.push('Late in the game');
   if (game?.isElimination === true) reasons.push('Elimination');
   return [...new Set(reasons)].slice(0, 3);
