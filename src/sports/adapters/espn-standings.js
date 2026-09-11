@@ -123,7 +123,44 @@ export async function enrichGamesWithEspnStandings(games, year = new Date().getF
   const leagueIds = [...new Set(games.map((game) => game.leagueId))].filter((leagueId) => ESPN_STANDINGS[leagueId]);
   const results = await Promise.allSettled(leagueIds.map(async (leagueId) => [leagueId, await getCachedStandings(leagueId, year)]));
   const byLeague = new Map(), diagnostics = [];
-  for (const result of results) { if (result.status !== 'fulfilled') continue; const [leagueId, standings] = result.value, lookup = new Map(); let entries = standings.entries; if (leagueId === 'mlb') { const records = await enrichMlbRecordData(entries, year); entries = entries.map((entry) => ({ ...entry, ...(records.get(entry.id) ?? {}) })); } for (const entry of entries) { lookup.set(entry.id, entry); lookup.set(clean(entry.name), entry); } byLeague.set(leagueId, lookup); diagnostics.push({ leagueId, provider: standings.provider, cached: standings.cached, stale: standings.stale, deduped: standings.deduped ?? false, durationMs: standings.durationMs, ageMs: standings.ageMs ?? 0, count: entries.length, enrichedRecordFields: leagueId === 'mlb' ? ['runDifferential', 'homeWins', 'homeLosses', 'homeWinPercentage', 'awayWins', 'awayLosses', 'awayWinPercentage', 'lastTenWins', 'lastTenLosses', 'lastTenWinPercentage'] : [] }); }
+  for (const result of results) {
+    if (result.status !== 'fulfilled') continue;
+    const [leagueId, standings] = result.value, lookup = new Map();
+    let entries = standings.entries;
+    if (leagueId === 'mlb') {
+      const records = await enrichMlbRecordData(entries, year);
+      entries = entries.map((entry) => ({ ...entry, ...(records.get(entry.id) ?? {}) }));
+    }
+    for (const entry of entries) { lookup.set(entry.id, entry); lookup.set(clean(entry.name), entry); }
+    byLeague.set(leagueId, lookup);
+    const leagueGames = games.filter((game) => game.leagueId === leagueId);
+    const matchedTeams = leagueGames.reduce((count, game) => {
+      for (const team of [game.homeTeam, game.awayTeam]) {
+        if (!team) continue;
+        const canonicalId = resolveCanonicalTeamId(team);
+        if (lookup.has(canonicalId) || lookup.has(clean(team.name))) count += 1;
+      }
+      return count;
+    }, 0);
+    diagnostics.push({
+      leagueId,
+      provider: standings.provider,
+      cached: standings.cached,
+      stale: standings.stale,
+      deduped: standings.deduped ?? false,
+      durationMs: standings.durationMs,
+      ageMs: standings.ageMs ?? 0,
+      count: entries.length,
+      matchedTeams,
+      totalTeams: leagueGames.length * 2,
+      matchedGames: leagueGames.filter((game) => {
+        const home = game.homeTeam, away = game.awayTeam;
+        const homeId = resolveCanonicalTeamId(home), awayId = resolveCanonicalTeamId(away);
+        return Boolean((lookup.has(homeId) || lookup.has(clean(home?.name))) && (lookup.has(awayId) || lookup.has(clean(away?.name))));
+      }).length,
+      enrichedRecordFields: leagueId === 'mlb' ? ['runDifferential', 'homeWins', 'homeLosses', 'homeWinPercentage', 'awayWins', 'awayLosses', 'awayWinPercentage', 'lastTenWins', 'lastTenLosses', 'lastTenWinPercentage'] : [],
+    });
+  }
   const enriched = games.map((game) => enrichGame(game, byLeague.get(game.leagueId) ?? new Map()));
   enriched.games = enriched;
   enriched.diagnostics = diagnostics;
