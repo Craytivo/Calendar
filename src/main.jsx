@@ -11,6 +11,7 @@ import { GameDetailModal } from './components/GameDetailModal.jsx';
 import { MyGamesView } from './components/MyGamesView.jsx';
 import { ViewSwitcher } from './components/ViewSwitcher.jsx';
 import './styles.css';
+import './dark-theme.css';
 
 const viewerTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 const CALENDAR_REFRESH_MS = 300_000;
