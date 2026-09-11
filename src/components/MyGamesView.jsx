@@ -45,15 +45,27 @@ function chronological(a, b) {
   return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
 }
 
-function Section({ title, games, emptyMessage, onOpenGame }) {
+function Section({ title, games, emptyMessage, onOpenGame, featured = false }) {
   return (
-    <section className="my-games-section">
+    <section className={`my-games-section ${featured ? 'featured-section' : ''}`}>
       <div className="my-games-section-heading">
-        <h2>{title}</h2>
+        <div className="section-heading-copy">
+          <h2>{title}</h2>
+          {featured && <span className="section-heading-rule" aria-hidden="true" />}
+        </div>
         {games.length > 0 && <span className="section-count">{games.length}</span>}
       </div>
       {games.length > 0
-        ? <div className="my-games-cards">{games.map((game) => <GameCard key={game.id} game={game} onOpen={onOpenGame} />)}</div>
+        ? <div className={`my-games-cards ${featured ? 'worth-watching-cards' : ''}`}>
+            {games.map((game, index) => (
+              <GameCard
+                key={game.id}
+                game={game}
+                featured={featured && index === 0}
+                onOpen={onOpenGame}
+              />
+            ))}
+          </div>
         : <div className="section-empty">{emptyMessage}</div>}
     </section>
   );
@@ -73,7 +85,9 @@ function AllGamesSection({ games, onOpenGame }) {
   return (
     <section className="my-games-section all-games-section">
       <div className="my-games-section-heading">
-        <h2>All Games</h2>
+        <div className="section-heading-copy">
+          <h2>All Games</h2>
+        </div>
         <span className="section-count">{games.length}</span>
       </div>
       <div className="all-games-days">
@@ -101,6 +115,7 @@ export function MyGamesView({ games, now, onOpenGame }) {
       const time = new Date(game.startTime).getTime();
       return time >= start.getTime() && time < end.getTime();
     });
+
   }, [games, now]);
 
   const worthWatching = useMemo(() => [...windowGames].sort(compareGames).slice(0, SECTION_LIMIT), [windowGames]);
@@ -121,6 +136,7 @@ export function MyGamesView({ games, now, onOpenGame }) {
         title="Worth Watching"
         games={worthWatching}
         onOpenGame={onOpenGame}
+        featured
         emptyMessage="No games are currently ranked in your scope."
       />
 
