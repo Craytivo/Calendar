@@ -114,7 +114,7 @@ export function CalendarView({ games, cursor, onShiftWeek, onOpenGame }) {
             <div><span className="eyebrow">Day view</span><h3 id="calendar-modal-title">{formatDate(selectedDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h3></div>
             <button className="icon-button" onClick={() => setSelectedDateKey(null)} aria-label="Close date details"><X size={18} /></button>
           </div>
-          <IntelligentDaySummary games={selectedGames} date={selectedDate} onOpenGame={onOpenGame} />
+          <IntelligentDaySummary games={selectedGames} date={selectedDate} />
           {selectedGames.length > 0
             ? <div className="calendar-modal-games">{selectedGames.map((game) => <GameCard key={game.identity.gameId} game={game} onOpen={onOpenGame} />)}</div>
             : <div className="calendar-modal-empty">No games scheduled for this date.</div>}
