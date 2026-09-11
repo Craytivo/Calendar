@@ -1,7 +1,4 @@
 import React, { useMemo } from 'react';
-import { favoriteTeamIds } from '../sports/team-identity.js';
-import { getLiveSignalRank } from '../sports/game-intelligence.js';
-import { scoreGameV2 } from '../sports/scoring/index-v2.js';
 import { GameCard } from './GameCard.jsx';
 import './MyGamesView.css';
 
@@ -19,39 +16,35 @@ function localDateKey(date) {
 }
 
 function isCurrentDay(game, now) {
-  return localDateKey(game.startTime) === localDateKey(now);
+  return localDateKey(game.schedule.startTime) === localDateKey(now);
 }
 
 function isFavoriteGame(game) {
-  return favoriteTeamIds.has(game.homeTeamId) || favoriteTeamIds.has(game.awayTeamId);
-}
-
-function priorityScore(game) {
-  return scoreGameV2(game).total;
+  return game.v2.components.personal.score > 0;
 }
 
 function compareGames(a, b) {
-  const aLive = a.status === 'live';
-  const bLive = b.status === 'live';
+  const aLive = a.status.state === 'live';
+  const bLive = b.status.state === 'live';
   if (aLive !== bLive) return Number(bLive) - Number(aLive);
   if (aLive && bLive) {
-    const liveDifference = getLiveSignalRank(a) - getLiveSignalRank(b);
+    const liveDifference = (b.live.score ?? 0) - (a.live.score ?? 0);
     if (liveDifference !== 0) return liveDifference;
   }
-  const scoreDifference = priorityScore(b) - priorityScore(a);
+  const scoreDifference = b.v2.total - a.v2.total;
   if (scoreDifference !== 0) return scoreDifference;
-  return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+  return new Date(a.schedule.startTime).getTime() - new Date(b.schedule.startTime).getTime();
 }
 
 function chronological(a, b) {
-  return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+  return new Date(a.schedule.startTime).getTime() - new Date(b.schedule.startTime).getTime();
 }
 
 function CardGrid({ games, onOpenGame, signal = false }) {
   return (
     <div className={`my-games-cards ${signal ? 'signal-grid' : 'standard-grid'}`}>
       {games.map((game) => (
-        <div className="game-card-slot" key={game.id}>
+        <div className="game-card-slot" key={game.identity.gameId}>
           <GameCard game={game} onOpen={onOpenGame} />
         </div>
       ))}
@@ -77,7 +70,7 @@ function AllGamesSection({ games, onOpenGame }) {
   const groups = useMemo(() => {
     const map = new Map();
     [...games].sort(chronological).forEach((game) => {
-      const key = localDateKey(game.startTime);
+      const key = localDateKey(game.schedule.startTime);
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(game);
     });
@@ -110,20 +103,20 @@ export function MyGamesView({ games, now, onOpenGame }) {
     const end = new Date(start);
     end.setDate(end.getDate() + WINDOW_DAYS);
     return games.filter((game) => {
-      const time = new Date(game.startTime).getTime();
+      const time = new Date(game.schedule.startTime).getTime();
       return time >= start.getTime() && time < end.getTime();
     });
   }, [games, now]);
 
-  const worthWatching = useMemo(() => games
+  const worthWatching = useMemo(() => [...games]
     .filter((game) => isCurrentDay(game, now))
-    .filter((game) => game.status !== 'final')
+    .filter((game) => game.status.state !== 'final')
     .sort(compareGames)
     .slice(0, SECTION_LIMIT), [games, now]);
 
   const yourNextGames = useMemo(() => [...windowGames]
     .filter(isFavoriteGame)
-    .filter((game) => new Date(game.startTime).getTime() >= new Date(now).getTime() || game.status === 'live')
+    .filter((game) => new Date(game.schedule.startTime).getTime() >= new Date(now).getTime() || game.status.state === 'live')
     .sort(chronological)
     .slice(0, SECTION_LIMIT), [windowGames, now]);
 
