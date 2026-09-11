@@ -45,15 +45,12 @@ function chronological(a, b) {
   return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
 }
 
-function Section({ eyebrow, title, games, emptyMessage, onOpenGame }) {
+function Section({ title, games, emptyMessage, onOpenGame }) {
   return (
     <section className="my-games-section">
       <div className="my-games-section-heading">
-        <div>
-          <span className="day-kicker">{eyebrow}</span>
-          <h2>{title}</h2>
-        </div>
-        {games.length > 0 && <span className="section-count">{games.length} {games.length === 1 ? 'game' : 'games'}</span>}
+        <h2>{title}</h2>
+        {games.length > 0 && <span className="section-count">{games.length}</span>}
       </div>
       {games.length > 0
         ? <div className="my-games-cards">{games.map((game) => <GameCard key={game.id} game={game} onOpen={onOpenGame} />)}</div>
@@ -76,11 +73,8 @@ function AllGamesSection({ games, onOpenGame }) {
   return (
     <section className="my-games-section all-games-section">
       <div className="my-games-section-heading">
-        <div>
-          <span className="day-kicker">Everything in scope</span>
-          <h2>All Games</h2>
-        </div>
-        <span className="section-count">{games.length} games</span>
+        <h2>All Games</h2>
+        <span className="section-count">{games.length}</span>
       </div>
       <div className="all-games-days">
         {groups.map(([key, dayGames]) => (
@@ -124,7 +118,6 @@ export function MyGamesView({ games, now, onOpenGame }) {
   return (
     <div className="my-games-list">
       <Section
-        eyebrow="Algorithmic ranking"
         title="Worth Watching"
         games={worthWatching}
         onOpenGame={onOpenGame}
@@ -132,11 +125,10 @@ export function MyGamesView({ games, now, onOpenGame }) {
       />
 
       <Section
-        eyebrow="Your favorites"
-        title="Your Next Games"
+        title="Your Teams"
         games={yourNextGames}
         onOpenGame={onOpenGame}
-        emptyMessage="None of your favorite teams have another game in this seven-day window."
+        emptyMessage="None of your favorite teams play in the next seven days."
       />
 
       <AllGamesSection games={windowGames} onOpenGame={onOpenGame} />
