@@ -19,6 +19,7 @@ import './watch-score-refinement.css';
 import './premium-visual-system.css';
 import './contrast-system.css';
 import './skin-redesign.css';
+import './skin-levelup.css';
 
 const viewerTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 const CALENDAR_REFRESH_MS = 300_000;
