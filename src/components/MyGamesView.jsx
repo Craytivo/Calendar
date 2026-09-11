@@ -1,15 +1,43 @@
-import React from 'react';
-import { getMyGamesSections } from '../sports/selectors.js';
+import React, { useMemo } from 'react';
+import { favoriteTeamIds } from '../sports/team-identity.js';
+import { getGameScore } from '../sports/game-score.js';
+import { getLiveSignalRank } from '../sports/game-intelligence.js';
 import { GameCard } from './GameCard.jsx';
-import { TodayBrief } from './TodayBrief.jsx';
-import { NextUp } from './NextUp.jsx';
-import { IntelligentDaySummary } from './IntelligentDaySummary.jsx';
-import { WeeklyRadar } from './WeeklyRadar.jsx';
 import './MyGamesView.css';
-import './TodayBrief.css';
-import './NextUp.css';
-import './IntelligentDaySummary.css';
-import './WeeklyRadar.css';
+
+const SECTION_LIMIT = 5;
+const WINDOW_DAYS = 7;
+
+function startOfDay(date) {
+  const value = new Date(date);
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
+function localDateKey(date) {
+  const value = new Date(date);
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+}
+
+function isFavoriteGame(game) {
+  return favoriteTeamIds.has(game.homeTeamId) || favoriteTeamIds.has(game.awayTeamId);
+}
+
+function compareGames(a, b) {
+  const aLive = a.status === 'live';
+  const bLive = b.status === 'live';
+  if (aLive !== bLive) return Number(bLive) - Number(aLive);
+  if (aLive && bLive) {
+    const liveDifference = getLiveSignalRank(a) - getLiveSignalRank(b);
+    if (liveDifference !== 0) return liveDifference;
+  }
+  const scoreDifference = getGameScore(b) - getGameScore(a);
+  if (scoreDifference !== 0) return scoreDifference;
+  return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+}
+
+function chronological(a, b) {
+  return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+}
 
 function Section({ eyebrow, title, games, emptyMessage, onOpenGame }) {
   return (
@@ -18,28 +46,97 @@ function Section({ eyebrow, title, games, emptyMessage, onOpenGame }) {
         <div><span className="day-kicker">{eyebrow}</span><h2>{title}</h2></div>
         {games.length > 0 && <span className="section-count">{games.length} {games.length === 1 ? 'game' : 'games'}</span>}
       </div>
-      {games.length > 0 ? <div className="my-games-cards">{games.map((game) => <GameCard key={game.id} game={game} onOpen={onOpenGame} />)}</div> : <div className="section-empty">{emptyMessage}</div>}
+      {games.length > 0
+        ? <div className="my-games-cards">{games.map((game) => <GameCard key={game.id} game={game} onOpen={onOpenGame} />)}</div>
+        : <div className="section-empty">{emptyMessage}</div>}
+    </section>
+  );
+}
+
+function AllGamesSection({ games, onOpenGame }) {
+  const groups = useMemo(() => {
+    const map = new Map();
+    [...games].sort(chronological).forEach((game) => {
+      const key = localDateKey(game.startTime);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(game);
+    });
+    return [...map.entries()];
+  }, [games]);
+
+  return (
+    <section className="my-games-section all-games-section">
+      <div className="my-games-section-heading">
+        <div><span className="day-kicker">Everything in scope</span><h2>All Games</h2></div>
+        <span className="section-count">{games.length} games</span>
+      </div>
+      <div className="all-games-days">
+        {groups.map(([key, dayGames]) => (
+          <div className="all-games-day" key={key}>
+            <div className="all-games-day-heading">
+              {new Date(`${key}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+            </div>
+            <div className="my-games-cards">
+              {dayGames.map((game) => <GameCard key={game.id} game={game} onOpen={onOpenGame} />)}
+            </div>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
 
 export function MyGamesView({ games, now, onOpenGame }) {
-  const { today, upcoming } = getMyGamesSections(games, now);
-  const hasGames = today.length > 0 || upcoming.length > 0;
-  if (!hasGames) return <section className="empty-state"><div className="empty-state-mark">—</div><h2>No games in view</h2><p>Your selected sports don't have any games in your category scope over the next seven days.</p></section>;
+  const windowGames = useMemo(() => {
+    const start = startOfDay(now);
+    const end = new Date(start);
+    end.setDate(end.getDate() + WINDOW_DAYS);
+    return games.filter((game) => {
+      const time = new Date(game.startTime).getTime();
+      return time >= start.getTime() && time < end.getTime();
+    });
+  }, [games, now]);
 
-  return <div className="my-games-list">
-    <header className="my-games-intro">
-      <div className="my-games-title-block"><span className="day-kicker">My Games · Signal over noise</span><h1>What matters today</h1><p>Open the app and get the games worth your attention first. Look ahead when you want.</p></div>
-      <div className="signal-status"><span className="signal-status-dot" />Signal active</div>
-    </header>
-    <TodayBrief games={games} now={now} onOpenGame={onOpenGame} />
-    <NextUp games={games} now={now} onOpenGame={onOpenGame} />
-    <IntelligentDaySummary games={games} date={now} onOpenGame={onOpenGame} />
-    <div className="my-games-sections">
-      <Section eyebrow="Today" title="Today's Games" games={today} onOpenGame={onOpenGame} emptyMessage="Nothing else from your category scope is scheduled today." />
-      <Section eyebrow="Next 6 Days" title="Next 6 Days" games={upcoming} onOpenGame={onOpenGame} emptyMessage="No games from your category scope in the next six days." />
+  const worthWatching = useMemo(() => [...windowGames].sort(compareGames).slice(0, SECTION_LIMIT), [windowGames]);
+
+  const yourNextGames = useMemo(() => [...windowGames]
+    .filter(isFavoriteGame)
+    .filter((game) => new Date(game.startTime).getTime() >= new Date(now).getTime() || game.status === 'live')
+    .sort(chronological)
+    .slice(0, SECTION_LIMIT), [windowGames, now]);
+
+  if (!windowGames.length) {
+    return <section className="empty-state"><div className="empty-state-mark">—</div><h2>No games in view</h2><p>Your selected sports don't have any games over the next seven days.</p></section>;
+  }
+
+  return (
+    <div className="my-games-list">
+      <header className="my-games-intro">
+        <div className="my-games-title-block">
+          <span className="day-kicker">Personal sports calendar · Signal over noise</span>
+          <h1>My Games</h1>
+          <p>Start with the games worth your attention, see your teams next, or browse everything.</p>
+        </div>
+        <div className="signal-status"><span className="signal-status-dot" />Signal active</div>
+      </header>
+
+      <Section
+        eyebrow="Algorithmic ranking"
+        title="Worth Watching"
+        games={worthWatching}
+        onOpenGame={onOpenGame}
+        emptyMessage="No games are currently ranked in your scope."
+      />
+
+      <Section
+        eyebrow="Your favorites"
+        title="Your Next Games"
+        games={yourNextGames}
+        onOpenGame={onOpenGame}
+        emptyMessage="None of your favorite teams have another game in this seven-day window."
+      />
+
+      <AllGamesSection games={windowGames} onOpenGame={onOpenGame} />
     </div>
-    <WeeklyRadar games={games} now={now} onOpenGame={onOpenGame} />
-  </div>;
+  );
 }
