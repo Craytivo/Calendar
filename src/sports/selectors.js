@@ -5,6 +5,7 @@ import { getLiveSignalRank } from './game-intelligence.js';
 
 const MY_GAMES_WINDOW_DAYS = 7;
 const MY_GAMES_SECTION_LIMIT = 5;
+const MY_GAMES_DAILY_MAJOR_LIMIT = 3;
 const NCAA_TOP_25_RANKING = 25;
 const favoriteTeamIds = new Set(teams.filter((team) => team.favorite).map((team) => team.id));
 const mustSeeTeamIds = new Set(teams.filter((team) => team.favoriteTier === 'must-see').map((team) => team.id));
@@ -17,7 +18,19 @@ function isFavoriteGame(game) { return gameHasTeam(game, favoriteTeamIds); }
 function isMustSeeGame(game) { return gameHasTeam(game, mustSeeTeamIds); }
 function isNcaaTop25Game(game) { if (game.leagueId !== 'ncaa-football') return false; const isRankedTop25 = (team) => { const ranking = Number(team?.ranking); return Number.isFinite(ranking) && ranking >= 1 && ranking <= NCAA_TOP_25_RANKING; }; return isRankedTop25(game.homeTeam) || isRankedTop25(game.awayTeam); }
 function isMajorEvent(game) { return game.isMajorEvent === true || game.eventType === 'championship' || game.eventType === 'final'; }
-function isDisplayableMyGame(game) { return isFavoriteGame(game) || isMustSeeGame(game) || isMajorEvent(game) || isMajorGameForPriority(game) || isMajorUclGameForPriority(game) || isNcaaTop25Game(game) || (game.leagueId === 'ufc' && game.eventType === 'main-card'); }
+function isMajorMyGame(game) { return isMajorEvent(game) || isMajorGameForPriority(game) || isMajorUclGameForPriority(game) || isNcaaTop25Game(game) || (game.leagueId === 'ufc' && game.eventType === 'main-card'); }
+function isDisplayableMyGame(game) { return isFavoriteGame(game) || isMustSeeGame(game) || isMajorMyGame(game); }
+function applyDailyMajorCap(games) {
+  const majorCounts = new Map();
+  return games.filter((game) => {
+    if (isFavoriteGame(game) || !isMajorMyGame(game)) return true;
+    const dateKey = getLocalDateKey(new Date(game.startTime));
+    const count = majorCounts.get(dateKey) ?? 0;
+    if (count >= MY_GAMES_DAILY_MAJOR_LIMIT) return false;
+    majorCounts.set(dateKey, count + 1);
+    return true;
+  });
+}
 function isLive(game) { return game.status === 'live'; }
 function compareForDisplay(a, b) {
   const liveDifference = Number(isLive(b)) - Number(isLive(a)); if (liveDifference !== 0) return liveDifference;
@@ -28,7 +41,7 @@ function compareForDisplay(a, b) {
   return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
 }
 export function getGamesForDate(games, date) { const start = startOfDay(date); const end = addDays(start, 1); return games.filter((game) => isWithinRange(game, start, end)).sort(compareForDisplay); }
-export function getMyGamesWindow(games, now = new Date()) { const start = startOfDay(now); const endExclusive = addDays(start, MY_GAMES_WINDOW_DAYS); return games.filter((game) => isWithinRange(game, start, endExclusive)).filter(isDisplayableMyGame).sort(compareForDisplay); }
+export function getMyGamesWindow(games, now = new Date()) { const start = startOfDay(now); const endExclusive = addDays(start, MY_GAMES_WINDOW_DAYS); const candidates = games.filter((game) => isWithinRange(game, start, endExclusive)).filter(isDisplayableMyGame).sort(compareForDisplay); return applyDailyMajorCap(candidates); }
 export function getMyGames(games, now = new Date()) { return getMyGamesWindow(games, now); }
 export function getTodayMyGames(games, now = new Date()) { const todayKey = getLocalDateKey(now); return getMyGames(games, now).filter((game) => getLocalDateKey(new Date(game.startTime)) === todayKey); }
 export function getUpcomingMyGames(games, now = new Date()) { const todayKey = getLocalDateKey(now); return getMyGames(games, now).filter((game) => getLocalDateKey(new Date(game.startTime)) !== todayKey); }
