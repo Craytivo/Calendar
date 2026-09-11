@@ -17,7 +17,7 @@ function isFavoriteGame(game) { return gameHasTeam(game, favoriteTeamIds); }
 function isMustSeeGame(game) { return gameHasTeam(game, mustSeeTeamIds); }
 function isNcaaTop25Game(game) { if (game.leagueId !== 'ncaa-football') return false; const isRankedTop25 = (team) => { const ranking = Number(team?.ranking); return Number.isFinite(ranking) && ranking >= 1 && ranking <= NCAA_TOP_25_RANKING; }; return isRankedTop25(game.homeTeam) || isRankedTop25(game.awayTeam); }
 function isMajorEvent(game) { return game.isMajorEvent === true || game.eventType === 'championship' || game.eventType === 'final'; }
-function isDisplayableMyGame(game) { return isFavoriteGame(game) || isMustSeeGame(game) || isMajorEvent(game) || isMajorGameForPriority(game) || isMajorUclGameForPriority(game) || game.leagueId === 'nfl' || isNcaaTop25Game(game) || (game.leagueId === 'ufc' && game.eventType === 'main-card'); }
+function isDisplayableMyGame(game) { return isFavoriteGame(game) || isMustSeeGame(game) || isMajorEvent(game) || isMajorGameForPriority(game) || isMajorUclGameForPriority(game) || isNcaaTop25Game(game) || (game.leagueId === 'ufc' && game.eventType === 'main-card'); }
 function isLive(game) { return game.status === 'live'; }
 function compareForDisplay(a, b) {
   const liveDifference = Number(isLive(b)) - Number(isLive(a)); if (liveDifference !== 0) return liveDifference;
