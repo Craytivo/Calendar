@@ -29,6 +29,18 @@ function scoreBase(breakdown) {
   );
 }
 
+function withContributions(breakdown, personalModifier) {
+  return {
+    ...breakdown,
+    competitive: { ...breakdown.competitive, contribution: (breakdown.competitive.score / breakdown.competitive.max) * 30 },
+    teamQuality: { ...breakdown.teamQuality, contribution: (breakdown.teamQuality.score / breakdown.teamQuality.max) * 20 },
+    stakes: { ...breakdown.stakes, contribution: (breakdown.stakes.score / breakdown.stakes.max) * 20 },
+    narrative: { ...breakdown.narrative, contribution: (breakdown.narrative.score / breakdown.narrative.max) * 15 },
+    form: { ...breakdown.form, contribution: (breakdown.form.score / breakdown.form.max) * 10 },
+    personal: { ...breakdown.personal, contribution: personalModifier, uiContribution: personalModifier },
+  };
+}
+
 export function scoreGameV2(game) {
   const competitive = scoreCompetitiveV2(game);
   const stakes = scoreStakes(game);
@@ -38,9 +50,10 @@ export function scoreGameV2(game) {
   const personal = scorePersonal(game, favoriteTeamIds, mustSeeTeamIds);
   const dataCompleteness = scoreDataCompleteness(game);
 
-  const breakdown = { competitive, stakes, teamQuality, narrative, form, personal, dataCompleteness };
-  const baseScore = scoreBase(breakdown);
+  const initialBreakdown = { competitive, stakes, teamQuality, narrative, form, personal, dataCompleteness };
+  const baseScore = scoreBase(initialBreakdown);
   const personalModifier = getPersonalModifier(personal);
+  const breakdown = withContributions(initialBreakdown, personalModifier);
   const rawTotal = Math.round(clamp(baseScore + personalModifier));
 
   // Confidence describes how much supporting data we have; it must not become a
