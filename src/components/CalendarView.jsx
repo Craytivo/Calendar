@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { GameCard } from './GameCard.jsx';
 import { IntelligentDaySummary } from './IntelligentDaySummary.jsx';
-import './calendar-radar-refinement.css';
+import './CalendarView.css';
 import './IntelligentDaySummary.css';
 
 const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -58,9 +58,9 @@ export function CalendarView({ games, cursor, onShiftWeek, onOpenGame }) {
     <section className="calendar-view">
       <div className="calendar-heading">
         <div>
-          <span className="eyebrow">Visual weekly radar</span>
+          <span className="eyebrow">Weekly radar</span>
           <h2>{formatDate(weekStart, { month: 'short', day: 'numeric' })} – {formatDate(weekEnd, { month: 'short', day: 'numeric', year: 'numeric' })}</h2>
-          <p className="calendar-subtitle">A quiet view of the week. Select a day to see the games.</p>
+          <p className="calendar-subtitle">Scan the week, then open a day for ranked games and V2 reasoning.</p>
         </div>
         <div className="month-controls">
           <button className="icon-button" onClick={() => onShiftWeek(-1)} aria-label="Previous week"><ChevronLeft size={18} /></button>
@@ -68,10 +68,10 @@ export function CalendarView({ games, cursor, onShiftWeek, onOpenGame }) {
         </div>
       </div>
 
-      <div className="calendar-radar-summary">
+      <div className="calendar-radar-summary" aria-label="Weekly game summary">
         <div><strong>{totalGames}</strong><span>games</span></div>
-        <div><strong>{priorityGames}</strong><span>priority</span></div>
-        <div className="radar-legend"><span className="legend-dot priority" />Priority <span className="legend-dot live" />Live</div>
+        <div><strong>{priorityGames}</strong><span>ranked</span></div>
+        <div className="radar-legend"><span className="legend-dot priority" />Ranked <span className="legend-dot live" />Live</div>
       </div>
 
       <div className="calendar-card">
@@ -106,12 +106,12 @@ export function CalendarView({ games, cursor, onShiftWeek, onOpenGame }) {
         </div>
       </div>
 
-      <p className="calendar-note">My Games stays focused on what matters. This radar shows the broader week at a glance.</p>
+      <p className="calendar-note">The radar is intentionally lightweight; the selected day contains the detailed V2 view.</p>
 
       {selectedDateKey && <div className="calendar-modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setSelectedDateKey(null)}>
         <div className="calendar-modal" role="dialog" aria-modal="true" aria-labelledby="calendar-modal-title">
           <div className="calendar-modal-header">
-            <div><span className="eyebrow">Game schedule</span><h3 id="calendar-modal-title">{formatDate(selectedDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h3><span className="calendar-modal-count">{selectedGames.length} {selectedGames.length === 1 ? 'game' : 'games'}</span></div>
+            <div><span className="eyebrow">Day view</span><h3 id="calendar-modal-title">{formatDate(selectedDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h3></div>
             <button className="icon-button" onClick={() => setSelectedDateKey(null)} aria-label="Close date details"><X size={18} /></button>
           </div>
           <IntelligentDaySummary games={selectedGames} date={selectedDate} onOpenGame={onOpenGame} />
