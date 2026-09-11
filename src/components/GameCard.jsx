@@ -11,9 +11,8 @@ import { TeamMark, getDisplayTeamName } from './TeamMark.jsx';
 import './GameCard.css';
 
 const PEAK_SCORE_STORAGE_KEY = 'calendar:game-score-peaks:v1';
-function formatTime(startTime) { return new Date(startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
 function minutesUntil(startTime) { return Math.max(0, Math.ceil((new Date(startTime).getTime() - Date.now()) / 60000)); }
-function statusLabel(game, startingSoon) { if (game.status === 'live') return 'LIVE'; if (game.status === 'final') return 'FINAL'; if (game.status === 'postponed') return 'POSTPONED'; if (game.status === 'cancelled') return 'CANCELLED'; if (startingSoon) return `STARTS IN ${minutesUntil(game.startTime)}M`; return formatTime(game.startTime); }
+function statusLabel(game, startingSoon) { if (game.status === 'live') return 'LIVE'; if (game.status === 'final') return 'FINAL'; if (game.status === 'postponed') return 'POSTPONED'; if (game.status === 'cancelled') return 'CANCELLED'; if (startingSoon) return `STARTS IN ${minutesUntil(game.startTime)}M`; return new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
 function teamLabel(team, leagueId) { const name = getDisplayTeamName(team); const ranking = leagueId === 'ncaa-football' && Number.isInteger(team?.ranking) && team.ranking > 0 && team.ranking <= 25 ? `#${team.ranking} ` : ''; return `${ranking}${name}`; }
 function scoreFor(game, side) { const topLevel = side === 'away' ? game.awayScore : game.homeScore; if (topLevel != null) return topLevel; const teamScore = side === 'away' ? game.awayTeam?.score : game.homeTeam?.score; return teamScore != null ? teamScore : null; }
 function readPeakScore(gameId) { if (typeof window === 'undefined' || !gameId) return 0; try { const values = JSON.parse(window.localStorage.getItem(PEAK_SCORE_STORAGE_KEY) || '{}'); return Number(values[gameId]) || 0; } catch { return 0; } }
@@ -59,22 +58,37 @@ export function GameCard({ game, compact = false, onOpen }) {
   return (
     <button type="button" className={`game-card ${compact ? 'compact' : ''} ${isLive ? 'live' : ''} ${isFinal ? 'final' : ''} ${isStartingSoon ? 'starting-soon' : ''} ${isFavorite ? 'favorite-team-card' : ''} ${priorityClass(priorityTier)} score-${gameScoreLevel.toLowerCase()}`} onClick={() => onOpen?.(game)} aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}, Priority ${priorityScore}, ${priorityTier}`} data-priority-score={priorityScore} data-score={priorityScore} data-raw-score={rawPriorityScore} data-confidence-adjusted-score={confidenceAdjustedPriority} data-confidence={priorityConfidence} data-score-tier={priorityTier} data-game-score={gameScore}>
       <header className="game-card-header">
-        <span className="game-card-league">{league?.shortName || game.leagueId.toUpperCase()}</span>
-        <div className="game-card-header-meta">
-          <span className="game-card-score" title={`Priority ${priorityScore} · ${priorityTier}${lowConfidence ? ` · ${Math.round(priorityConfidence * 100)}% confidence` : ''}`} aria-label={`Priority ${priorityScore}, ${priorityTier}${lowConfidence ? `, ${Math.round(priorityConfidence * 100)}% confidence` : ''}`}><strong>{priorityScore}</strong></span>
-          {isLive && <span className="game-card-score game-card-live-score" title={`Live Game Score ${gameScore} · ${gameScoreLevel}`} aria-label={`Live Game Score ${gameScore}, ${gameScoreLevel}`}><strong>{gameScore}</strong><small>LIVE</small></span>}
-          {isStartingSoon && !isLive && <Clock3 size={12} aria-hidden="true" />}
-          {isLive && <span className="game-card-live-dot" aria-hidden="true" />}
-          <span className="game-card-time">{statusLabel(game, isStartingSoon)}</span>
-          {isFavorite && <Star size={13} fill="currentColor" className="game-card-favorite" aria-label="Favorite team" />}
+        <div className="game-card-context">
+          <span className="game-card-league">{league?.shortName || game.leagueId.toUpperCase()}</span>
+          {isLive && <span className="game-card-status live-status"><span className="game-card-live-dot" aria-hidden="true" />LIVE</span>}
+          {!isLive && isStartingSoon && <span className="game-card-status starting-status"><Clock3 size={11} aria-hidden="true" />{statusLabel(game, true)}</span>}
+          {!isLive && !isStartingSoon && isFinal && <span className="game-card-status">FINAL</span>}
+        </div>
+        <div className="game-card-header-right">
+          <div className="game-card-priority" title={`Priority ${priorityScore} · ${priorityTier}${lowConfidence ? ` · ${Math.round(priorityConfidence * 100)}% confidence` : ''}`} aria-label={`Priority ${priorityScore}, ${priorityTier}${lowConfidence ? `, ${Math.round(priorityConfidence * 100)}% confidence` : ''}`}>
+            <span>PRIORITY</span>
+            <strong>{priorityScore}</strong>
+          </div>
+          {isLive && <div className="game-card-live-metric" title={`Live Game Score ${gameScore} · ${gameScoreLevel}`} aria-label={`Live Game Score ${gameScore}, ${gameScoreLevel}`}><span>LIVE SCORE</span><strong>{gameScore}</strong></div>}
+          {isFavorite && <Star size={15} fill="currentColor" className="game-card-favorite" aria-label="Favorite team" />}
         </div>
       </header>
+
       <div className={`game-card-matchup ${hasScore ? 'has-score' : ''}`}>
-        <div className={`game-card-team ${isFinal && awayScore != null && homeScore != null && awayScore > homeScore ? 'winner' : ''}`}><TeamMark team={away} size={compact ? 'medium' : 'large'} /><span>{teamLabel(away, game.leagueId)}</span>{hasScore && <strong>{awayScore ?? '—'}</strong>}</div>
-        <div className="game-card-vs" aria-hidden="true">{hasScore ? (meta || (isLive ? 'LIVE' : 'FINAL')) : 'at'}</div>
-        <div className={`game-card-team ${isFinal && awayScore != null && homeScore != null && homeScore > awayScore ? 'winner' : ''}`}><TeamMark team={home} size={compact ? 'medium' : 'large'} /><span>{teamLabel(home, game.leagueId)}</span>{hasScore && <strong>{homeScore ?? '—'}</strong>}</div>
+        <div className={`game-card-team ${isFinal && awayScore != null && homeScore != null && awayScore > homeScore ? 'winner' : ''}`}>
+          <TeamMark team={away} size={compact ? 'medium' : 'large'} />
+          <span>{teamLabel(away, game.leagueId)}</span>
+          {hasScore && <strong>{awayScore ?? '—'}</strong>}
+        </div>
+        <div className="game-card-divider" aria-hidden="true" />
+        <div className={`game-card-team ${isFinal && awayScore != null && homeScore != null && homeScore > awayScore ? 'winner' : ''}`}>
+          <TeamMark team={home} size={compact ? 'medium' : 'large'} />
+          <span>{teamLabel(home, game.leagueId)}</span>
+          {hasScore && <strong>{homeScore ?? '—'}</strong>}
+        </div>
       </div>
-      {!compact && whyItMatters.length > 0 && <footer className="game-card-insight"><div><small>{whyItMatters[0]}</small></div></footer>}
+
+      {!compact && whyItMatters.length > 0 && <footer className="game-card-insight"><span>WHY IT MATTERS</span><strong>{whyItMatters[0]}</strong></footer>}
     </button>
   );
 }
