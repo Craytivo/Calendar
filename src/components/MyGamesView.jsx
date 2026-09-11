@@ -18,6 +18,10 @@ function localDateKey(date) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
 }
 
+function isCurrentDay(game, now) {
+  return localDateKey(game.startTime) === localDateKey(now);
+}
+
 function isFavoriteGame(game) {
   return favoriteTeamIds.has(game.homeTeamId) || favoriteTeamIds.has(game.awayTeamId);
 }
@@ -46,8 +50,8 @@ function chronological(a, b) {
 function CardGrid({ games, onOpenGame, signal = false }) {
   return (
     <div className={`my-games-cards ${signal ? 'signal-grid' : 'standard-grid'}`}>
-      {games.map((game, index) => (
-        <div className={`game-card-slot ${signal && index === 0 ? 'lead-slot' : ''}`} key={game.id}>
+      {games.map((game) => (
+        <div className="game-card-slot" key={game.id}>
           <GameCard game={game} onOpen={onOpenGame} />
         </div>
       ))}
@@ -111,7 +115,12 @@ export function MyGamesView({ games, now, onOpenGame }) {
     });
   }, [games, now]);
 
-  const worthWatching = useMemo(() => [...windowGames].sort(compareGames).slice(0, SECTION_LIMIT), [windowGames]);
+  const worthWatching = useMemo(() => games
+    .filter((game) => isCurrentDay(game, now))
+    .filter((game) => game.status !== 'final')
+    .sort(compareGames)
+    .slice(0, SECTION_LIMIT), [games, now]);
+
   const yourNextGames = useMemo(() => [...windowGames]
     .filter(isFavoriteGame)
     .filter((game) => new Date(game.startTime).getTime() >= new Date(now).getTime() || game.status === 'live')
@@ -124,7 +133,7 @@ export function MyGamesView({ games, now, onOpenGame }) {
 
   return (
     <div className="my-games-list">
-      <Section title="Worth Watching" games={worthWatching} onOpenGame={onOpenGame} signal emptyMessage="No games are currently ranked in your scope." />
+      <Section title="Worth Watching" games={worthWatching} onOpenGame={onOpenGame} signal emptyMessage="No upcoming or live games are currently ranked for today." />
       <Section title="Your Teams" games={yourNextGames} onOpenGame={onOpenGame} emptyMessage="None of your favorite teams play in the next seven days." />
       <AllGamesSection games={windowGames} onOpenGame={onOpenGame} />
     </div>
