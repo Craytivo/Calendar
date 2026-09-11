@@ -11,7 +11,6 @@ import { TeamMark, getDisplayTeamName } from './TeamMark.jsx';
 import './GameCard.css';
 
 const PEAK_SCORE_STORAGE_KEY = 'calendar:game-score-peaks:v1';
-
 function formatTime(startTime) { return new Date(startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
 function minutesUntil(startTime) { return Math.max(0, Math.ceil((new Date(startTime).getTime() - Date.now()) / 60000)); }
 function statusLabel(game, startingSoon) { if (game.status === 'live') return 'LIVE'; if (game.status === 'final') return 'FINAL'; if (game.status === 'postponed') return 'POSTPONED'; if (game.status === 'cancelled') return 'CANCELLED'; if (startingSoon) return `STARTS IN ${minutesUntil(game.startTime)}M`; return formatTime(game.startTime); }
@@ -19,29 +18,11 @@ function teamLabel(team, leagueId) { const name = getDisplayTeamName(team); cons
 function scoreFor(game, side) { const topLevel = side === 'away' ? game.awayScore : game.homeScore; if (topLevel != null) return topLevel; const teamScore = side === 'away' ? game.awayTeam?.score : game.homeTeam?.score; return teamScore != null ? teamScore : null; }
 function readPeakScore(gameId) { if (typeof window === 'undefined' || !gameId) return 0; try { const values = JSON.parse(window.localStorage.getItem(PEAK_SCORE_STORAGE_KEY) || '{}'); return Number(values[gameId]) || 0; } catch { return 0; } }
 function writePeakScore(gameId, score) { if (typeof window === 'undefined' || !gameId || !Number.isFinite(score)) return; try { const values = JSON.parse(window.localStorage.getItem(PEAK_SCORE_STORAGE_KEY) || '{}'); if (score <= (Number(values[gameId]) || 0)) return; values[gameId] = score; window.localStorage.setItem(PEAK_SCORE_STORAGE_KEY, JSON.stringify(values)); } catch { /* Non-critical persistence. */ } }
-function getScoringReasons(scoring) {
-  const breakdown = scoring?.breakdown || {};
-  return [
-    ...(breakdown.stakes?.reasons || []),
-    ...(breakdown.narrative?.reasons || []),
-    ...(breakdown.personal?.reasons || []),
-    ...(breakdown.competitive?.reasons || []),
-    ...(breakdown.teamQuality?.reasons || []),
-    ...(breakdown.form?.reasons || []),
-  ].filter(Boolean).filter((reason, index, reasons) => reasons.indexOf(reason) === index);
-}
-function getWhyItMatters(game, scoring, priorityReasons, liveSignal, gameScore) {
-  const modelReasons = getScoringReasons(scoring);
-  const scoreReasons = getGameScoreReasons(game);
-  const primary = game.status === 'live' ? (scoreReasons[0] || liveSignal?.reason) : modelReasons[0];
-  const secondaryPool = game.status === 'live' ? [...scoreReasons, ...modelReasons, ...priorityReasons] : [...modelReasons, ...priorityReasons, ...scoreReasons];
-  const secondary = secondaryPool.find((reason) => reason && reason !== primary) || (gameScore >= 75 ? 'High Game Score' : null);
-  return [primary, secondary].filter(Boolean).slice(0, 2);
-}
+function getScoringReasons(scoring) { const breakdown = scoring?.breakdown || {}; return [...(breakdown.stakes?.reasons || []), ...(breakdown.narrative?.reasons || []), ...(breakdown.personal?.reasons || []), ...(breakdown.competitive?.reasons || []), ...(breakdown.teamQuality?.reasons || []), ...(breakdown.form?.reasons || [])].filter(Boolean).filter((reason, index, reasons) => reasons.indexOf(reason) === index); }
+function getWhyItMatters(game, scoring, priorityReasons, liveSignal, gameScore) { const modelReasons = getScoringReasons(scoring); const scoreReasons = getGameScoreReasons(game); const primary = game.status === 'live' ? (scoreReasons[0] || liveSignal?.reason) : modelReasons[0]; const secondaryPool = game.status === 'live' ? [...scoreReasons, ...modelReasons, ...priorityReasons] : [...modelReasons, ...priorityReasons, ...scoreReasons]; const secondary = secondaryPool.find((reason) => reason && reason !== primary) || (gameScore >= 75 ? 'High Game Score' : null); return [primary, secondary].filter(Boolean).slice(0, 2); }
 function priorityClass(tier) { return `priority-${String(tier || '').toLowerCase().replace(/\s+/g, '-')}`; }
-function intensityClass(score) { if (score >= 90) return 'intensity-high'; if (score >= 70) return 'intensity-medium'; if (score >= 55) return 'intensity-low'; return 'intensity-quiet'; }
 
-export function GameCard({ game, compact = false, featured = false, onOpen }) {
+export function GameCard({ game, compact = false, onOpen }) {
   const league = leagues.find((item) => item.id === game.leagueId);
   const scoring = scoreGameV2(game);
   const priorityScore = scoring.total;
@@ -76,12 +57,12 @@ export function GameCard({ game, compact = false, featured = false, onOpen }) {
   }, [game.id, currentGameScore, peakScore]);
 
   return (
-    <button type="button" className={`game-card ${compact ? 'compact' : ''} ${featured ? 'featured' : ''} ${isLive ? 'live' : ''} ${isFinal ? 'final' : ''} ${isStartingSoon ? 'starting-soon' : ''} ${isFavorite ? 'favorite-team-card' : ''} ${priorityClass(priorityTier)} ${intensityClass(priorityScore)} score-${gameScoreLevel.toLowerCase()}`} onClick={() => onOpen?.(game)} aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}, Priority ${priorityScore}, ${priorityTier}`} data-priority-score={priorityScore} data-score={priorityScore} data-raw-score={rawPriorityScore} data-confidence-adjusted-score={confidenceAdjustedPriority} data-confidence={priorityConfidence} data-score-tier={priorityTier} data-game-score={gameScore}>
+    <button type="button" className={`game-card ${compact ? 'compact' : ''} ${isLive ? 'live' : ''} ${isFinal ? 'final' : ''} ${isStartingSoon ? 'starting-soon' : ''} ${isFavorite ? 'favorite-team-card' : ''} ${priorityClass(priorityTier)} score-${gameScoreLevel.toLowerCase()}`} onClick={() => onOpen?.(game)} aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}, Priority ${priorityScore}, ${priorityTier}`} data-priority-score={priorityScore} data-score={priorityScore} data-raw-score={rawPriorityScore} data-confidence-adjusted-score={confidenceAdjustedPriority} data-confidence={priorityConfidence} data-score-tier={priorityTier} data-game-score={gameScore}>
       <header className="game-card-header">
         <span className="game-card-league">{league?.shortName || game.leagueId.toUpperCase()}</span>
         <div className="game-card-header-meta">
           <span className="game-card-score" title={`Priority ${priorityScore} · ${priorityTier}${lowConfidence ? ` · ${Math.round(priorityConfidence * 100)}% confidence` : ''}`} aria-label={`Priority ${priorityScore}, ${priorityTier}${lowConfidence ? `, ${Math.round(priorityConfidence * 100)}% confidence` : ''}`}><strong>{priorityScore}</strong></span>
-          {isLive && <span className={`game-card-score game-card-live-score score-${gameScoreLevel.toLowerCase()}`} title={`Live Game Score ${gameScore} · ${gameScoreLevel}`} aria-label={`Live Game Score ${gameScore}, ${gameScoreLevel}`}><strong>{gameScore}</strong><small>LIVE</small></span>}
+          {isLive && <span className="game-card-score game-card-live-score" title={`Live Game Score ${gameScore} · ${gameScoreLevel}`} aria-label={`Live Game Score ${gameScore}, ${gameScoreLevel}`}><strong>{gameScore}</strong><small>LIVE</small></span>}
           {isStartingSoon && !isLive && <Clock3 size={12} aria-hidden="true" />}
           {isLive && <span className="game-card-live-dot" aria-hidden="true" />}
           <span className="game-card-time">{statusLabel(game, isStartingSoon)}</span>
@@ -93,7 +74,7 @@ export function GameCard({ game, compact = false, featured = false, onOpen }) {
         <div className="game-card-vs" aria-hidden="true">{hasScore ? (meta || (isLive ? 'LIVE' : 'FINAL')) : 'at'}</div>
         <div className={`game-card-team ${isFinal && awayScore != null && homeScore != null && homeScore > awayScore ? 'winner' : ''}`}><TeamMark team={home} size={compact ? 'medium' : 'large'} /><span>{teamLabel(home, game.leagueId)}</span>{hasScore && <strong>{homeScore ?? '—'}</strong>}</div>
       </div>
-      {!compact && whyItMatters.length > 0 && <footer className="game-card-insight"><div>{whyItMatters.map((reason, index) => <small key={`${reason}-${index}`}>{reason}</small>)}</div></footer>}
+      {!compact && whyItMatters.length > 0 && <footer className="game-card-insight"><div><small>{whyItMatters[0]}</small></div></footer>}
     </button>
   );
 }
