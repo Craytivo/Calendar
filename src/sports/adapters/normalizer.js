@@ -42,6 +42,7 @@ export function normalizeGame(raw = {}) {
     isTwoLegTie:toBoolean(raw.isTwoLegTie), leg:toNumber(raw.leg), isFirstLeg:toBoolean(raw.isFirstLeg), isSecondLeg:toBoolean(raw.isSecondLeg), isDivisional:toBoolean(raw.isDivisional),
     isElimination:toBoolean(raw.isElimination), isMajorEvent:toBoolean(raw.isMajorEvent), isRivalry:toBoolean(raw.isRivalry), hasPlayoffImplications:toBoolean(raw.hasPlayoffImplications),
     hasSeedingImplications:toBoolean(raw.hasSeedingImplications), hasQualificationImplications:toBoolean(raw.hasQualificationImplications), hasTitleOrUclQualificationImplications:toBoolean(raw.hasTitleOrUclQualificationImplications),
+    ...(raw.odds ? { odds: raw.odds } : {}),
     homeScore,awayScore,homeTeam,awayTeam,
     ...(raw.soccerStats ? { soccerStats: raw.soccerStats } : {})
   };
