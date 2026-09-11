@@ -2,8 +2,10 @@ import React, { useMemo } from 'react';
 import { getDisplayTeamName } from './TeamMark.jsx';
 import './IntelligentDaySummary.css';
 
+const WATCH_TIERS = new Set(['must-watch', 'excellent', 'strong', 'worth-watching']);
+
 function isWorthWatching(game) {
-  return game.v2.total >= 55;
+  return WATCH_TIERS.has(game.v2.tier.id);
 }
 
 export function IntelligentDaySummary({ games, date, onOpenGame }) {
