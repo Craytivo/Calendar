@@ -116,27 +116,17 @@ export function GameCard({ game, compact = false, onOpen }) {
           )}
 
           <div className="game-card-components" aria-label="GameScore V2 component contributions">
-            {topComponents.map(([id, component]) => {
-              const contribution = Number(component.contribution ?? 0);
-              const maxContribution = id === 'competitive' ? 30
-                : id === 'teamQuality' ? 20
-                  : id === 'stakes' ? 20
-                    : id === 'narrative' ? 15
-                      : id === 'form' ? 10
-                        : 5;
-              const width = Math.max(0, Math.min(100, (contribution / maxContribution) * 100));
-              return (
-                <div className="game-card-component" key={id}>
-                  <div className="game-card-component-topline">
-                    <span>{COMPONENT_LABELS[id]}</span>
-                    <strong>+{Math.round(contribution)}</strong>
-                  </div>
-                  <div className="game-card-component-track" aria-hidden="true">
-                    <span style={{ width: `${width}%` }} />
-                  </div>
+            {topComponents.map(([id, component]) => (
+              <div className="game-card-component" key={id}>
+                <div className="game-card-component-topline">
+                  <span>{COMPONENT_LABELS[id]}</span>
+                  <strong>+{Math.round(Number(component.contribution ?? 0))}</strong>
                 </div>
-              );
-            })}
+                <div className="game-card-component-track" aria-hidden="true">
+                  <span style={{ width: `${component.contributionPercent ?? 0}%` }} />
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       )}
@@ -153,9 +143,8 @@ export function GameCard({ game, compact = false, onOpen }) {
       )}
 
       <footer className="game-card-footer">
-        <span>{confidenceLabel(v2.confidence)}</span>
+        <span>{isLive ? 'Live intelligence' : isFinal ? 'Completed' : schedule.displayDate}</span>
         {isLive && live.level && <span>Live {live.level.toLowerCase()}</span>}
-        {!isLive && !isFinal && <span>{schedule.displayDate}</span>}
         <ChevronRight size={14} aria-hidden="true" />
       </footer>
     </button>
