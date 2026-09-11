@@ -55,3 +55,56 @@ assert.equal(summary.ucl.clockModes.elapsed, 1);
 assert.equal(summary.ucl.highestScore.id, ucl.id);
 
 console.log('API diagnostic tests passed');
+
+if (process.env.LIVE_API_DIAGNOSTIC === '1') {
+  const { fetchEspnLeagueWindow } = await import('./adapters/espn-schedules.js');
+  const { enrichGamesWithEspnStandings } = await import('./adapters/espn-standings.js');
+
+  const startDate = new Date('2026-09-11T00:00:00-06:00');
+  const games = await fetchEspnLeagueWindow('mlb', startDate, 7);
+  const enriched = await enrichGamesWithEspnStandings(games, startDate.getFullYear());
+  const actual = enriched.games.find((game) => {
+    const names = [game.homeTeam?.name, game.awayTeam?.name];
+    return names.includes('Baltimore Orioles') && names.includes('Toronto Blue Jays');
+  });
+
+  assert.ok(actual, 'live ESPN payload should contain Orioles vs Blue Jays');
+
+  const live = buildV2GameDiagnostic(actual);
+  const { away, home } = live.apiData;
+
+  const pct = (value) => value == null ? 'MISSING' : `${value}%`;
+
+  console.log('\n=== LIVE ORIOLES vs BLUE JAYS V2 TRACE ===');
+  console.log(`GAME: ${live.matchup}`);
+  console.log(`ID: ${live.id}`);
+  console.log('');
+  console.log('API DATA');
+  console.log(`├── Orioles win %: ${pct(away.winPercentage)}`);
+  console.log(`├── Orioles rank: ${away.leagueRank ?? 'MISSING'}`);
+  console.log(`├── Orioles run differential: ${away.runDifferential ?? 'MISSING'}`);
+  console.log(`├── Orioles away %: ${pct(away.splitWinPercentage)}`);
+  console.log(`├── Orioles L10 %: ${pct(away.lastTenWinPercentage)}`);
+  console.log(`├── Blue Jays win %: ${pct(home.winPercentage)}`);
+  console.log(`├── Blue Jays rank: ${home.leagueRank ?? 'MISSING'}`);
+  console.log(`├── Blue Jays run differential: ${home.runDifferential ?? 'MISSING'}`);
+  console.log(`├── Blue Jays home %: ${pct(home.splitWinPercentage)}`);
+  console.log(`└── Blue Jays L10 %: ${pct(home.lastTenWinPercentage)}`);
+  console.log('');
+  console.log('V2 CONTRIBUTIONS');
+  console.log(`├── Competitive: ${live.v2.competitive} / 30`);
+  console.log(`├── Team Quality: ${live.v2.teamQuality} / 20`);
+  console.log(`├── Stakes: ${live.v2.stakes} / 20`);
+  console.log(`├── Narrative: ${live.v2.narrative} / 15`);
+  console.log(`├── Form: ${live.v2.form} / 10`);
+  console.log(`├── Personal: ${live.v2.personal} / 5`);
+  console.log(`└── TOTAL: ${live.v2.total} / 100`);
+  console.log('');
+  console.log(`CONFIDENCE: ${Math.round(live.confidence * 100)}%`);
+  console.log('');
+  console.log('REASONS');
+  for (const reason of live.reasons) console.log(`├── ${reason}`);
+  console.log('');
+  console.log('RAW V2 BREAKDOWN');
+  console.log(JSON.stringify(live.breakdown, null, 2));
+}
