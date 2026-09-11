@@ -70,6 +70,14 @@ if (process.env.LIVE_API_DIAGNOSTIC === '1') {
 
   assert.ok(actual, 'live ESPN payload should contain Orioles vs Blue Jays');
 
+  console.log('\n=== MLB ENRICHMENT BOUNDARY ===');
+  console.log(`Standings diagnostics: ${JSON.stringify(enriched.diagnostics, null, 2)}`);
+  console.log(`Schedule team IDs: away=${actual.awayTeam?.id ?? 'MISSING'} home=${actual.homeTeam?.id ?? 'MISSING'}`);
+  console.log(`Schedule team names: away=${actual.awayTeam?.name ?? 'MISSING'} home=${actual.homeTeam?.name ?? 'MISSING'}`);
+  console.log('Enriched team fields:');
+  console.log(`├── Orioles: ${JSON.stringify({ id: actual.awayTeam?.id, winPercentage: actual.awayTeam?.winPercentage, leagueRank: actual.awayTeam?.leagueRank, runDifferential: actual.awayTeam?.runDifferential, awayWinPercentage: actual.awayTeam?.awayWinPercentage, lastTenWinPercentage: actual.awayTeam?.lastTenWinPercentage })}`);
+  console.log(`└── Blue Jays: ${JSON.stringify({ id: actual.homeTeam?.id, winPercentage: actual.homeTeam?.winPercentage, leagueRank: actual.homeTeam?.leagueRank, runDifferential: actual.homeTeam?.runDifferential, homeWinPercentage: actual.homeTeam?.homeWinPercentage, lastTenWinPercentage: actual.homeTeam?.lastTenWinPercentage })}`);
+
   const live = buildV2GameDiagnostic(actual);
   const { away, home } = live.apiData;
 
