@@ -4,13 +4,15 @@ import { scoreGameV2 } from '../scoring/index-v2.js';
 
 const COMPONENT_ORDER = ['competitive', 'teamQuality', 'stakes', 'narrative', 'form', 'personal'];
 
-function teamView(team = {}) {
+function teamView(team = {}, leagueId = '') {
   return {
     id: String(team.id ?? ''),
     name: String(team.name ?? 'TBD'),
     abbreviation: String(team.abbreviation ?? ''),
+    leagueId: team.leagueId || leagueId || null,
     ranking: Number.isFinite(Number(team.ranking)) ? Number(team.ranking) : null,
     logoUrl: team.logoUrl ?? null,
+    primaryColor: team.primaryColor ?? team.color ?? null,
   };
 }
 
@@ -67,6 +69,7 @@ export function toGameViewModel(game, scoring = scoreGameV2(game)) {
   const liveSnapshot = getGameScoreSnapshot(game);
   const components = scoring.breakdown ?? {};
   const startTime = game.startTime;
+  const scoreboard = scoreboardFor(game);
 
   return {
     identity: {
@@ -89,8 +92,8 @@ export function toGameViewModel(game, scoring = scoreGameV2(game)) {
     },
 
     teams: {
-      away: teamView(game.awayTeam),
-      home: teamView(game.homeTeam),
+      away: teamView(game.awayTeam, game.leagueId),
+      home: teamView(game.homeTeam, game.leagueId),
     },
 
     status: {
@@ -132,8 +135,8 @@ export function toGameViewModel(game, scoring = scoreGameV2(game)) {
       score: liveSnapshot.score,
       level: liveSnapshot.level,
       trend: null,
-      homeScore: scoreboardFor(game).home,
-      awayScore: scoreboardFor(game).away,
+      homeScore: scoreboard.home,
+      awayScore: scoreboard.away,
       events: [],
       reasons: liveSnapshot.reasons,
     },
