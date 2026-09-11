@@ -11,7 +11,6 @@ import { GameDetailModal } from './components/GameDetailModal.jsx';
 import { MyGamesView } from './components/MyGamesView.jsx';
 import { ViewSwitcher } from './components/ViewSwitcher.jsx';
 import './styles.css';
-import './dark-theme.css';
 
 const viewerTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 const CALENDAR_REFRESH_MS = 300_000;
@@ -28,12 +27,7 @@ function formatFreshness(date, loading) {
 }
 
 function localDateKey(date) {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: viewerTimeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(date));
+  return new Intl.DateTimeFormat('en-CA', { timeZone: viewerTimeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(date));
 }
 
 function App() {
@@ -61,22 +55,18 @@ function App() {
     const requestId = ++calendarRequestRef.current;
     if (!silent) setLoading(true);
     setError('');
-
     try {
       const response = await fetch(`/api/sports?days=7&timezone=${encodeURIComponent(viewerTimeZone)}`, { cache: 'no-store' });
       if (!response.ok) throw new Error('Sports data unavailable');
       const payload = await response.json();
       if (requestId !== calendarRequestRef.current) return;
-
       const nextGames = sanitizeGames(payload.games ?? []);
       const protectedLive = Array.from(liveGamesRef.current.values());
       setGames(mergeLiveGames(nextGames, protectedLive));
       setDataHealth(payload.health ?? null);
       setLastUpdated(payload.fetchedAt ?? new Date().toISOString());
     } catch (err) {
-      if (requestId === calendarRequestRef.current && (!silent || !gamesRef.current.length)) {
-        setError(err.message || 'Unable to load sports data');
-      }
+      if (requestId === calendarRequestRef.current && (!silent || !gamesRef.current.length)) setError(err.message || 'Unable to load sports data');
     } finally {
       if (requestId === calendarRequestRef.current && !silent) setLoading(false);
     }
@@ -85,9 +75,7 @@ function App() {
   const todayLeagueIds = useMemo(() => {
     const todayKey = localDateKey(Date.now());
     const ids = new Set();
-    for (const game of games) {
-      if (localDateKey(game.startTime) === todayKey) ids.add(game.leagueId);
-    }
+    for (const game of games) if (localDateKey(game.startTime) === todayKey) ids.add(game.leagueId);
     return Array.from(ids).sort();
   }, [games]);
   const todayLeagueQuery = todayLeagueIds.join(',');
@@ -98,16 +86,11 @@ function App() {
     liveAbortRef.current?.abort();
     const controller = new AbortController();
     liveAbortRef.current = controller;
-
     try {
-      const response = await fetch(`/api/sports?mode=live&leagues=${encodeURIComponent(todayLeagueQuery)}&timezone=${encodeURIComponent(viewerTimeZone)}`, {
-        cache: 'no-store',
-        signal: controller.signal,
-      });
+      const response = await fetch(`/api/sports?mode=live&leagues=${encodeURIComponent(todayLeagueQuery)}&timezone=${encodeURIComponent(viewerTimeZone)}`, { cache: 'no-store', signal: controller.signal });
       if (!response.ok) throw new Error('Live sports data unavailable');
       const payload = await response.json();
       if (requestId !== liveRequestRef.current || controller.signal.aborted) return;
-
       const liveGames = sanitizeGames(payload.games ?? []);
       for (const game of liveGames) liveGamesRef.current.set(game.id, game);
       setGames((current) => mergeLiveGames(current, liveGames));
@@ -121,52 +104,32 @@ function App() {
   };
 
   useEffect(() => { void loadGames(); }, []);
-
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setFreshnessNow(Date.now());
-      void loadGames({ silent: true });
-    }, CALENDAR_REFRESH_MS);
+    const timer = window.setInterval(() => { setFreshnessNow(Date.now()); void loadGames({ silent: true }); }, CALENDAR_REFRESH_MS);
     return () => window.clearInterval(timer);
   }, []);
-
   useEffect(() => {
     if (!todayLeagueQuery) return undefined;
     let cancelled = false;
     let timer;
-
     const scheduleNextLiveRefresh = () => {
       if (cancelled) return;
       const delay = getGameStateRefreshDelay(gamesRef.current);
       if (delay == null) return;
-      timer = window.setTimeout(async () => {
-        setFreshnessNow(Date.now());
-        await loadLiveGames();
-        scheduleNextLiveRefresh();
-      }, delay);
+      timer = window.setTimeout(async () => { setFreshnessNow(Date.now()); await loadLiveGames(); scheduleNextLiveRefresh(); }, delay);
     };
-
     void loadLiveGames();
     scheduleNextLiveRefresh();
-
-    return () => {
-      cancelled = true;
-      if (timer) window.clearTimeout(timer);
-      liveAbortRef.current?.abort();
-    };
+    return () => { cancelled = true; if (timer) window.clearTimeout(timer); liveAbortRef.current?.abort(); };
   }, [todayLeagueQuery]);
-
   useEffect(() => {
     const timer = window.setInterval(() => setFreshnessNow(Date.now()), 10_000);
     return () => window.clearInterval(timer);
   }, []);
 
   const viewGames = useMemo(() => toGameViewModels(games), [games]);
-  const filteredGames = useMemo(() => viewGames
-    .filter((game) => activeLeagues.includes(game.league.id))
-    .filter((game) => !favoritesOnly || game.v2.components.personal.score > 0), [viewGames, activeLeagues, favoritesOnly]);
+  const filteredGames = useMemo(() => viewGames.filter((game) => activeLeagues.includes(game.league.id)).filter((game) => !favoritesOnly || game.v2.components.personal.score > 0), [viewGames, activeLeagues, favoritesOnly]);
   const selectedGame = useMemo(() => viewGames.find((game) => game.identity.gameId === selectedGameId) ?? null, [viewGames, selectedGameId]);
-
   const toggleLeague = (id) => setActiveLeagues((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]);
   const shiftWeek = (delta) => setCursor((current) => new Date(current.getFullYear(), current.getMonth(), current.getDate() + (delta * 7)));
   const nflUnavailable = dataHealth?.nfl?.status === 'error';
