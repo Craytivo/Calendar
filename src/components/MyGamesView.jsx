@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { favoriteTeamIds } from '../sports/team-identity.js';
-import { getGameScore } from '../sports/game-score.js';
 import { getLiveSignalRank } from '../sports/game-intelligence.js';
+import { scoreGameV2 } from '../sports/scoring/index-v2.js';
 import { GameCard } from './GameCard.jsx';
 import './MyGamesView.css';
 
@@ -22,15 +22,21 @@ function isFavoriteGame(game) {
   return favoriteTeamIds.has(game.homeTeamId) || favoriteTeamIds.has(game.awayTeamId);
 }
 
+function priorityScore(game) {
+  return scoreGameV2(game).total;
+}
+
 function compareGames(a, b) {
   const aLive = a.status === 'live';
   const bLive = b.status === 'live';
   if (aLive !== bLive) return Number(bLive) - Number(aLive);
+
   if (aLive && bLive) {
     const liveDifference = getLiveSignalRank(a) - getLiveSignalRank(b);
     if (liveDifference !== 0) return liveDifference;
   }
-  const scoreDifference = getGameScore(b) - getGameScore(a);
+
+  const scoreDifference = priorityScore(b) - priorityScore(a);
   if (scoreDifference !== 0) return scoreDifference;
   return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
 }
