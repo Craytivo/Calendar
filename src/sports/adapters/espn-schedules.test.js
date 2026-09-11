@@ -50,6 +50,11 @@ try {
       competitions: [{
         divisionCompetition: true,
         conferenceCompetition: true,
+        odds: [{
+          spread: 3.5,
+          overUnder: 48.5,
+          provider: { id: 'test-book', name: 'Test Book', priority: 1 },
+        }],
         competitors: [
           {
             id: '14',
@@ -70,15 +75,16 @@ try {
 
   globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => rams49ersPayload });
   const [rams49ers] = await fetchEspnLeagueWindow('nfl', new Date('2026-09-10T00:00:00Z'), 1);
-  const scoredFixture = { ...rams49ers, odds: { spread: 3.5, total: 48.5 } };
-  const rawScore = getRawGameScore(scoredFixture);
-  const calibratedScore = getGameScore(scoredFixture);
+  const rawScore = getRawGameScore(rams49ers);
+  const calibratedScore = getGameScore(rams49ers);
 
   assert.equal(rams49ers.isDivisional, true, 'NFL divisionCompetition must survive normalization');
   assert.equal(rams49ers.homeTeam.winPercentage, 1, 'NFL home record should produce win percentage');
   assert.equal(rams49ers.awayTeam.winPercentage, 0, 'NFL away record should produce win percentage');
   assert.equal(rams49ers.homeTeam.wins, 1);
   assert.equal(rams49ers.awayTeam.losses, 1);
+  assert.equal(rams49ers.odds.spread, 3.5, 'ESPN pregame spread must survive schedule normalization');
+  assert.equal(rams49ers.odds.total, 48.5, 'ESPN pregame total must survive schedule normalization');
   assert.ok(rawScore >= 20, `Rams-49ers raw score should reflect divisional + market context, got ${rawScore}`);
   assert.ok(calibratedScore >= 25, `Rams-49ers calibrated score should not collapse to ~5, got ${calibratedScore}`);
 
@@ -87,7 +93,7 @@ try {
     isDivisional: rams49ers.isDivisional,
     home: { name: rams49ers.homeTeam.name, wins: rams49ers.homeTeam.wins, losses: rams49ers.homeTeam.losses, winPercentage: rams49ers.homeTeam.winPercentage },
     away: { name: rams49ers.awayTeam.name, wins: rams49ers.awayTeam.wins, losses: rams49ers.awayTeam.losses, winPercentage: rams49ers.awayTeam.winPercentage },
-    odds: scoredFixture.odds,
+    odds: rams49ers.odds,
     rawScore,
     calibratedScore,
   }, null, 2));
