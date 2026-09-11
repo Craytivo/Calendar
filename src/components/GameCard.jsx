@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock3, Star } from 'lucide-react';
+import { Clock3, Star, ChevronRight, Activity } from 'lucide-react';
 import { TeamMark, getDisplayTeamName } from './TeamMark.jsx';
 import './GameCard.css';
 
@@ -7,94 +7,165 @@ function minutesUntil(startTime) {
   return Math.max(0, Math.ceil((new Date(startTime).getTime() - Date.now()) / 60000));
 }
 
-function priorityClass(tier) {
-  return `priority-${String(tier || '').toLowerCase().replace(/\s+/g, '-')}`;
-}
-
-function teamLabel(team, leagueId) {
-  const name = getDisplayTeamName(team);
-  const ranking = leagueId === 'ncaa-football' && Number.isInteger(team?.ranking) && team.ranking > 0 && team.ranking <= 25
+function teamLabel(team) {
+  const ranking = Number.isInteger(team?.ranking) && team.ranking > 0 && team.ranking <= 25
     ? `#${team.ranking} `
     : '';
-  return `${ranking}${name}`;
+  return `${ranking}${getDisplayTeamName(team)}`;
 }
+
+function confidenceLabel(confidence) {
+  if (confidence >= 0.85) return 'High confidence';
+  if (confidence >= 0.65) return 'Moderate confidence';
+  return 'Limited data';
+}
+
+const COMPONENT_LABELS = {
+  competitive: 'Competition',
+  teamQuality: 'Team quality',
+  stakes: 'Stakes',
+  narrative: 'Narrative',
+  form: 'Form',
+  personal: 'Personal',
+};
 
 export function GameCard({ game, compact = false, onOpen }) {
   const { identity, schedule, league, teams, status, v2, explanation, live } = game;
   const isLive = status.state === 'live';
   const isFinal = status.state === 'final';
-  const isStartingSoon = status.state === 'scheduled'
+  const isScheduled = status.state === 'scheduled';
+  const isStartingSoon = isScheduled
     && minutesUntil(schedule.startTime) <= 60
     && new Date(schedule.startTime).getTime() >= Date.now();
   const isFavorite = v2.components.personal.score > 0;
   const away = teams.away;
   const home = teams.home;
-  const awayScore = live.awayScore;
-  const homeScore = live.homeScore;
-  const hasScore = (isLive || isFinal) && (awayScore != null || homeScore != null);
-  const whyItMatters = [
-    isLive ? live.reasons?.[0] : explanation.primary,
-    isLive ? live.reasons?.[1] : explanation.secondary,
-  ].filter(Boolean).slice(0, 2);
-  const lowConfidence = v2.confidence < 0.85;
-  const liveLevel = live.level || 'LOW';
+  const hasScore = (isLive || isFinal) && (live.awayScore != null || live.homeScore != null);
+  const liveReasons = Array.isArray(live.reasons) ? live.reasons.filter(Boolean) : [];
+  const liveActive = isLive && live.score != null;
+  const components = Object.entries(v2.components)
+    .filter(([id]) => id !== 'personal' || v2.components.personal.uiContribution > 0)
+    .sort(([, a], [, b]) => Number(b.contribution ?? 0) - Number(a.contribution ?? 0));
+  const topComponents = components.slice(0, compact ? 2 : 6);
+  const dominantComponent = explanation.dominantComponent;
+  const dominantLabel = dominantComponent ? COMPONENT_LABELS[dominantComponent] : null;
+  const confidence = Math.round(v2.confidence * 100);
 
   return (
     <button
       type="button"
-      className={`game-card ${compact ? 'compact' : ''} ${isLive ? 'live' : ''} ${isFinal ? 'final' : ''} ${isStartingSoon ? 'starting-soon' : ''} ${isFavorite ? 'favorite-team-card' : ''} ${priorityClass(v2.tier.label)} score-${liveLevel.toLowerCase()}`}
+      className={`game-card ${compact ? 'compact' : ''} ${isLive ? 'live' : ''} ${isFinal ? 'final' : ''} ${isStartingSoon ? 'starting-soon' : ''}`}
       onClick={() => onOpen?.(game)}
-      aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}, Priority ${v2.total}, ${v2.tier.label}`}
+      aria-label={`View ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}. GameScore ${v2.total}, ${v2.tier.label}.`}
+      data-game-id={identity.gameId}
       data-priority-score={v2.total}
-      data-score={v2.total}
       data-confidence={v2.confidence}
-      data-score-tier={v2.tier.label}
-      data-game-score={live.score ?? 0}
     >
       <header className="game-card-header">
         <div className="game-card-context">
           <span className="game-card-league">{league.abbreviation}</span>
-          {!isLive && !isFinal && <span className="game-card-time"><Clock3 size={12} aria-hidden="true" />{schedule.displayTime}</span>}
           {isLive && <span className="game-card-status live-status"><span className="game-card-live-dot" aria-hidden="true" />LIVE</span>}
-          {isStartingSoon && !isLive && <span className="game-card-status starting-status">STARTS IN {minutesUntil(schedule.startTime)}M</span>}
           {isFinal && <span className="game-card-status">FINAL</span>}
+          {isScheduled && !isStartingSoon && <span className="game-card-time"><Clock3 size={12} aria-hidden="true" />{schedule.displayTime}</span>}
+          {isStartingSoon && <span className="game-card-status starting-status">STARTS IN {minutesUntil(schedule.startTime)}M</span>}
         </div>
-
-        <div className="game-card-header-right">
-          <div
-            className="game-card-priority"
-            title={`Priority ${v2.total} · ${v2.tier.label}${lowConfidence ? ` · ${Math.round(v2.confidence * 100)}% confidence` : ''}`}
-            aria-label={`Priority ${v2.total}, ${v2.tier.label}${lowConfidence ? `, ${Math.round(v2.confidence * 100)}% confidence` : ''}`}
-          >
-            <span>PRIORITY</span>
-            <strong>{v2.total}</strong>
-          </div>
-          {isLive && <div className="game-card-live-metric" title={`Live Game Score ${live.score} · ${live.level}`} aria-label={`Live Game Score ${live.score}, ${live.level}`}><span>LIVE SCORE</span><strong>{live.score}</strong></div>}
+        <div className="game-card-actions">
           {isFavorite && <Star size={15} fill="currentColor" className="game-card-favorite" aria-label="Favorite team" />}
+          <ChevronRight size={16} className="game-card-chevron" aria-hidden="true" />
         </div>
       </header>
 
-      <div className={`game-card-matchup ${hasScore ? 'has-score' : ''}`}>
-        <div className={`game-card-team ${isFinal && awayScore != null && homeScore != null && awayScore > homeScore ? 'winner' : ''}`}>
-          <TeamMark team={away} size={compact ? 'medium' : 'large'} />
-          <span>{teamLabel(away, league.id)}</span>
-          {hasScore && <strong>{awayScore ?? '—'}</strong>}
+      <section className="game-card-score-row" aria-label={`GameScore ${v2.total}, ${v2.tier.label}`}>
+        <div className="game-card-score">
+          <strong>{v2.total}</strong>
+          <span>GAMESCORE</span>
         </div>
-        <div className="game-card-divider" aria-hidden="true" />
-        <div className={`game-card-team ${isFinal && awayScore != null && homeScore != null && homeScore > awayScore ? 'winner' : ''}`}>
-          <TeamMark team={home} size={compact ? 'medium' : 'large'} />
-          <span>{teamLabel(home, league.id)}</span>
-          {hasScore && <strong>{homeScore ?? '—'}</strong>}
+        <div className="game-card-tier">
+          <span className="game-card-tier-label">{v2.tier.label}</span>
+          {dominantLabel && <span className="game-card-dominant">Driven by {dominantLabel.toLowerCase()}</span>}
         </div>
-      </div>
+        <div className="game-card-confidence" title={`${confidenceLabel(v2.confidence)} · ${confidence}%`}>
+          <span>DATA</span>
+          <strong>{confidence}%</strong>
+        </div>
+      </section>
 
-      {!compact && whyItMatters.length > 0 && (
-        <footer className="game-card-insight">
-          <span>WHY IT MATTERS</span>
-          <strong>{whyItMatters[0]}</strong>
-          {whyItMatters[1] && <small>{whyItMatters[1]}</small>}
-        </footer>
+      <section className={`game-card-matchup ${hasScore ? 'has-score' : ''}`}>
+        <div className={`game-card-team ${isFinal && awayScoreWins(live.awayScore, live.homeScore) ? 'winner' : ''}`}>
+          <TeamMark team={away} size={compact ? 'medium' : 'large'} />
+          <span>{teamLabel(away)}</span>
+          {hasScore && <strong>{live.awayScore ?? '—'}</strong>}
+        </div>
+        <div className="game-card-at">@</div>
+        <div className={`game-card-team ${isFinal && homeScoreWins(live.awayScore, live.homeScore) ? 'winner' : ''}`}>
+          <TeamMark team={home} size={compact ? 'medium' : 'large'} />
+          <span>{teamLabel(home)}</span>
+          {hasScore && <strong>{live.homeScore ?? '—'}</strong>}
+        </div>
+      </section>
+
+      {!compact && (
+        <section className="game-card-intelligence">
+          <div className="game-card-section-heading">
+            <span>WHY IT RANKS HERE</span>
+            {explanation.primary && <strong>{explanation.primary}</strong>}
+          </div>
+
+          {explanation.secondary && (
+            <p className="game-card-summary">{explanation.secondary}</p>
+          )}
+
+          <div className="game-card-components" aria-label="GameScore V2 component contributions">
+            {topComponents.map(([id, component]) => {
+              const contribution = Number(component.contribution ?? 0);
+              const maxContribution = id === 'competitive' ? 30
+                : id === 'teamQuality' ? 20
+                  : id === 'stakes' ? 20
+                    : id === 'narrative' ? 15
+                      : id === 'form' ? 10
+                        : 5;
+              const width = Math.max(0, Math.min(100, (contribution / maxContribution) * 100));
+              return (
+                <div className="game-card-component" key={id}>
+                  <div className="game-card-component-topline">
+                    <span>{COMPONENT_LABELS[id]}</span>
+                    <strong>+{Math.round(contribution)}</strong>
+                  </div>
+                  <div className="game-card-component-track" aria-hidden="true">
+                    <span style={{ width: `${width}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       )}
+
+      {liveActive && (
+        <section className="game-card-live-panel" aria-label={`Live score ${live.score}`}>
+          <div className="game-card-live-heading">
+            <span><Activity size={13} aria-hidden="true" /> LIVE WATCHABILITY</span>
+            <strong>{live.score}</strong>
+          </div>
+          {liveReasons[0] && <p>{liveReasons[0]}</p>}
+          {liveReasons[1] && <small>{liveReasons[1]}</small>}
+        </section>
+      )}
+
+      <footer className="game-card-footer">
+        <span>{confidenceLabel(v2.confidence)}</span>
+        {isLive && live.level && <span>Live {live.level.toLowerCase()}</span>}
+        {!isLive && !isFinal && <span>{schedule.displayDate}</span>}
+        <ChevronRight size={14} aria-hidden="true" />
+      </footer>
     </button>
   );
+}
+
+function awayScoreWins(awayScore, homeScore) {
+  return awayScore != null && homeScore != null && awayScore > homeScore;
+}
+
+function homeScoreWins(awayScore, homeScore) {
+  return awayScore != null && homeScore != null && homeScore > awayScore;
 }
