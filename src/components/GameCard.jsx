@@ -3,7 +3,7 @@ import { Clock3, Star } from 'lucide-react';
 import { leagues } from '../sports/leagues.js';
 import { getPriorityScore, getPriorityReasons } from '../sports/priority.js';
 import { favoriteTeamIds } from '../sports/team-identity.js';
-import { getGameScore, getGameScoreLevel } from '../sports/game-score.js';
+import { getGameScore, getGameScoreLevel, getGameScoreReasons } from '../sports/game-score.js';
 import { getLiveGameSignal } from '../sports/game-intelligence.js';
 import { formatScoreboardMeta } from '../sports/clock.js';
 import { TeamMark, getDisplayTeamName } from './TeamMark.jsx';
@@ -19,8 +19,9 @@ function scoreFor(game, side) { const topLevel = side === 'away' ? game.awayScor
 function readPeakScore(gameId) { if (typeof window === 'undefined' || !gameId) return 0; try { const values = JSON.parse(window.localStorage.getItem(PEAK_SCORE_STORAGE_KEY) || '{}'); return Number(values[gameId]) || 0; } catch { return 0; } }
 function writePeakScore(gameId, score) { if (typeof window === 'undefined' || !gameId || !Number.isFinite(score)) return; try { const values = JSON.parse(window.localStorage.getItem(PEAK_SCORE_STORAGE_KEY) || '{}'); if (score <= (Number(values[gameId]) || 0)) return; values[gameId] = score; window.localStorage.setItem(PEAK_SCORE_STORAGE_KEY, JSON.stringify(values)); } catch { /* Non-critical persistence. */ } }
 function getWhyItMatters(game, priorityReasons, liveSignal, gameScore) {
-  const primary = liveSignal?.reason || priorityReasons[0] || (game.isMajorEvent ? 'Major event' : null);
-  const secondary = priorityReasons.find((reason) => reason !== primary) || (gameScore >= 75 ? 'High Game Score' : null);
+  const scoreReasons = getGameScoreReasons(game);
+  const primary = scoreReasons[0] || liveSignal?.reason || priorityReasons[0] || (game.isMajorEvent ? 'Major event' : null);
+  const secondary = scoreReasons.find((reason) => reason !== primary) || priorityReasons.find((reason) => reason !== primary) || (gameScore >= 75 ? 'High Game Score' : null);
   return [primary, secondary].filter(Boolean).slice(0, 2);
 }
 
