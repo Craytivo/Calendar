@@ -43,7 +43,8 @@ export function normalizeGame(raw = {}) {
     isElimination:toBoolean(raw.isElimination), isMajorEvent:toBoolean(raw.isMajorEvent), isRivalry:toBoolean(raw.isRivalry), hasPlayoffImplications:toBoolean(raw.hasPlayoffImplications),
     hasSeedingImplications:toBoolean(raw.hasSeedingImplications), hasQualificationImplications:toBoolean(raw.hasQualificationImplications), hasTitleOrUclQualificationImplications:toBoolean(raw.hasTitleOrUclQualificationImplications),
     homeScore,awayScore,homeTeam,awayTeam,
-    ...(raw.soccerStats ? { soccerStats: raw.soccerStats } : {})
+    ...(raw.soccerStats ? { soccerStats: raw.soccerStats } : {}),
+    ...(raw.odds ? { odds: raw.odds } : {})
   };
   return Object.fromEntries(Object.entries(game).filter(([,value]) => value !== undefined && value !== ''));
 }
