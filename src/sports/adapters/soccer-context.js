@@ -19,9 +19,11 @@ export function normalizeUclStage(raw = {}, startTime) {
     .map(text)
     .join(' ');
 
-  if (rawText.includes('final')) return 'final';
+  // Check the specific knockout stages before "final": strings such as
+  // "quarter-final" and "semi-final" both contain the word "final".
   if (rawText.includes('semi-final') || rawText.includes('semi final') || rawText.includes('semi')) return 'semi-final';
   if (rawText.includes('quarter-final') || rawText.includes('quarter final') || rawText.includes('quarter')) return 'quarter-final';
+  if (rawText.includes('final')) return 'final';
   if (rawText.includes('round of 16') || rawText.includes('round-of-16')) return 'round-of-16';
   if (rawText.includes('knockout play-off') || rawText.includes('knockout playoff') || rawText.includes('play-off') || rawText.includes('playoff')) return 'knockout-playoff';
 
