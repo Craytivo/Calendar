@@ -40,27 +40,28 @@ function chronological(a, b) {
   return new Date(a.schedule.startTime).getTime() - new Date(b.schedule.startTime).getTime();
 }
 
-function CardGrid({ games, onOpenGame, signal = false }) {
+function CardGrid({ games, onOpenGame }) {
   return (
-    <div className={`my-games-cards ${signal ? 'signal-grid' : 'standard-grid'}`}>
+    <div className="my-games-cards">
       {games.map((game) => (
-        <div className="game-card-slot" key={game.identity.gameId}>
-          <GameCard game={game} onOpen={onOpenGame} />
-        </div>
+        <GameCard game={game} onOpen={onOpenGame} key={game.identity.gameId} />
       ))}
     </div>
   );
 }
 
-function Section({ title, games, emptyMessage, onOpenGame, signal = false }) {
+function Section({ title, description, games, emptyMessage, onOpenGame, signal = false }) {
   return (
     <section className={`my-games-section ${signal ? 'signal-section' : ''}`}>
       <div className="my-games-section-heading">
-        <h2>{title}</h2>
+        <div>
+          <h2>{title}</h2>
+          {description && <p>{description}</p>}
+        </div>
         {games.length > 0 && <span className="section-count">{games.length}</span>}
       </div>
       {games.length > 0
-        ? <CardGrid games={games} onOpenGame={onOpenGame} signal={signal} />
+        ? <CardGrid games={games} onOpenGame={onOpenGame} />
         : <div className="section-empty">{emptyMessage}</div>}
     </section>
   );
@@ -80,7 +81,10 @@ function AllGamesSection({ games, onOpenGame }) {
   return (
     <section className="my-games-section all-games-section">
       <div className="my-games-section-heading">
-        <h2>All Games</h2>
+        <div>
+          <h2>All Games</h2>
+          <p>Everything in the current seven-day window, ordered by start time.</p>
+        </div>
         <span className="section-count">{games.length}</span>
       </div>
       <div className="all-games-days">
@@ -88,6 +92,7 @@ function AllGamesSection({ games, onOpenGame }) {
           <div className="all-games-day" key={key}>
             <div className="all-games-day-heading">
               {new Date(`${key}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+              <span>{dayGames.length} {dayGames.length === 1 ? 'game' : 'games'}</span>
             </div>
             <CardGrid games={dayGames} onOpenGame={onOpenGame} />
           </div>
@@ -126,8 +131,21 @@ export function MyGamesView({ games, now, onOpenGame }) {
 
   return (
     <div className="my-games-list">
-      <Section title="Worth Watching" games={worthWatching} onOpenGame={onOpenGame} signal emptyMessage="No upcoming or live games are currently ranked for today." />
-      <Section title="Your Teams" games={yourNextGames} onOpenGame={onOpenGame} emptyMessage="None of your favorite teams play in the next seven days." />
+      <Section
+        title="Worth Watching"
+        description="Today's strongest games, ranked by GameScore V2."
+        games={worthWatching}
+        onOpenGame={onOpenGame}
+        signal
+        emptyMessage="No upcoming or live games are currently ranked for today."
+      />
+      <Section
+        title="Your Teams"
+        description="Upcoming games involving your favorite teams."
+        games={yourNextGames}
+        onOpenGame={onOpenGame}
+        emptyMessage="None of your favorite teams play in the next seven days."
+      />
       <AllGamesSection games={windowGames} onOpenGame={onOpenGame} />
     </div>
   );
