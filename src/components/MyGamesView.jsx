@@ -49,7 +49,10 @@ function Section({ eyebrow, title, games, emptyMessage, onOpenGame }) {
   return (
     <section className="my-games-section">
       <div className="my-games-section-heading">
-        <div><span className="day-kicker">{eyebrow}</span><h2>{title}</h2></div>
+        <div>
+          <span className="day-kicker">{eyebrow}</span>
+          <h2>{title}</h2>
+        </div>
         {games.length > 0 && <span className="section-count">{games.length} {games.length === 1 ? 'game' : 'games'}</span>}
       </div>
       {games.length > 0
@@ -73,7 +76,10 @@ function AllGamesSection({ games, onOpenGame }) {
   return (
     <section className="my-games-section all-games-section">
       <div className="my-games-section-heading">
-        <div><span className="day-kicker">Everything in scope</span><h2>All Games</h2></div>
+        <div>
+          <span className="day-kicker">Everything in scope</span>
+          <h2>All Games</h2>
+        </div>
         <span className="section-count">{games.length} games</span>
       </div>
       <div className="all-games-days">
@@ -117,15 +123,6 @@ export function MyGamesView({ games, now, onOpenGame }) {
 
   return (
     <div className="my-games-list">
-      <header className="my-games-intro">
-        <div className="my-games-title-block">
-          <span className="day-kicker">Personal sports calendar · Signal over noise</span>
-          <h1>My Games</h1>
-          <p>Start with the games worth your attention, see your teams next, or browse everything.</p>
-        </div>
-        <div className="signal-status"><span className="signal-status-dot" />Signal active</div>
-      </header>
-
       <Section
         eyebrow="Algorithmic ranking"
         title="Worth Watching"
