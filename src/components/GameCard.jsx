@@ -41,7 +41,7 @@ function getWhyItMatters(game, scoring, priorityReasons, liveSignal, gameScore) 
 function priorityClass(tier) { return `priority-${String(tier || '').toLowerCase().replace(/\s+/g, '-')}`; }
 function intensityClass(score) { if (score >= 90) return 'intensity-high'; if (score >= 70) return 'intensity-medium'; if (score >= 55) return 'intensity-low'; return 'intensity-quiet'; }
 
-export function GameCard({ game, compact = false, onOpen }) {
+export function GameCard({ game, compact = false, featured = false, onOpen }) {
   const league = leagues.find((item) => item.id === game.leagueId);
   const scoring = scoreGameV2(game);
   const priorityScore = scoring.total;
@@ -76,12 +76,12 @@ export function GameCard({ game, compact = false, onOpen }) {
   }, [game.id, currentGameScore, peakScore]);
 
   return (
-    <button type="button" className={`game-card ${compact ? 'compact' : ''} ${isLive ? 'live' : ''} ${isFinal ? 'final' : ''} ${isStartingSoon ? 'starting-soon' : ''} ${isFavorite ? 'favorite-team-card' : ''} ${priorityClass(priorityTier)} ${intensityClass(priorityScore)} score-${gameScoreLevel.toLowerCase()}`} onClick={() => onOpen?.(game)} aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}, Priority ${priorityScore}, ${priorityTier}`} data-priority-score={priorityScore} data-score={priorityScore} data-raw-score={rawPriorityScore} data-confidence-adjusted-score={confidenceAdjustedPriority} data-confidence={priorityConfidence} data-score-tier={priorityTier} data-game-score={gameScore}>
+    <button type="button" className={`game-card ${compact ? 'compact' : ''} ${featured ? 'featured' : ''} ${isLive ? 'live' : ''} ${isFinal ? 'final' : ''} ${isStartingSoon ? 'starting-soon' : ''} ${isFavorite ? 'favorite-team-card' : ''} ${priorityClass(priorityTier)} ${intensityClass(priorityScore)} score-${gameScoreLevel.toLowerCase()}`} onClick={() => onOpen?.(game)} aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}, Priority ${priorityScore}, ${priorityTier}`} data-priority-score={priorityScore} data-score={priorityScore} data-raw-score={rawPriorityScore} data-confidence-adjusted-score={confidenceAdjustedPriority} data-confidence={priorityConfidence} data-score-tier={priorityTier} data-game-score={gameScore}>
       <header className="game-card-header">
         <span className="game-card-league">{league?.shortName || game.leagueId.toUpperCase()}</span>
         <div className="game-card-header-meta">
           <span className="game-card-score" title={`Priority ${priorityScore} · ${priorityTier}${lowConfidence ? ` · ${Math.round(priorityConfidence * 100)}% confidence` : ''}`} aria-label={`Priority ${priorityScore}, ${priorityTier}${lowConfidence ? `, ${Math.round(priorityConfidence * 100)}% confidence` : ''}`}><strong>{priorityScore}</strong></span>
-          {isLive && <span className={`game-card-score game-card-live-score score-${gameScoreLevel.toLowerCase()}`} title={`Live Game Score ${gameScore} · ${gameScoreLevel}`} aria-label={`Live Game Score ${gameScore}, ${gameScoreLevel}`}><strong>{gameScore}</strong></span>}
+          {isLive && <span className={`game-card-score game-card-live-score score-${gameScoreLevel.toLowerCase()}`} title={`Live Game Score ${gameScore} · ${gameScoreLevel}`} aria-label={`Live Game Score ${gameScore}, ${gameScoreLevel}`}><strong>{gameScore}</strong><small>LIVE</small></span>}
           {isStartingSoon && !isLive && <Clock3 size={12} aria-hidden="true" />}
           {isLive && <span className="game-card-live-dot" aria-hidden="true" />}
           <span className="game-card-time">{statusLabel(game, isStartingSoon)}</span>
