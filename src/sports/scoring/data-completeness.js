@@ -32,7 +32,7 @@ export function scoreDataCompleteness(game) {
 
   if (leagueId === 'ucl') {
     const hasCompetitionContext = hasValue(game?.competitionPhase) || hasValue(game?.eventType);
-    const hasTeamContext = hasAny(home, ['leagueRank', 'ranking', 'conferenceRank']) && hasAny(away, ['leagueRank', 'ranking', 'conferenceRank']);
+    const hasTeamContext = hasValue(home?.leagueRank) && hasValue(away?.leagueRank);
     if (!hasCompetitionContext || !hasTeamContext) {
       reasons.push('Incomplete UCL team/competition context');
     }
