@@ -49,6 +49,24 @@ export function getGameScoreReasons(game) {
 export function getGameScoreSnapshot(game, peakScore) { const score = getGameScore(game, { peakScore }); return { score, level: getGameScoreLevel(score), reasons: getGameScoreReasons(game) }; }
 
 export function getGameScoreComponents(game) {
-  if (isSoccerGame(game)) { const rawScore = getRawGameScore(game); const soccer = getSoccerScoreComponents(game); const market = getSportMarketContext(game); return { rawScore, calibratedScore: calibrateGameScore(rawScore, game?.leagueId), calibrationProfile: getHistoricalCalibrationProfile(game?.leagueId), ...soccer, marketCompetitiveness: market.available ? market.competitivenessScore : 0, marketScoringEnvironment: market.available ? market.scoringEnvironmentScore : 0 }; }
+  if (isSoccerGame(game)) {
+    const rawScore = getRawGameScore(game);
+    const soccer = getSoccerScoreComponents(game);
+    const market = getSportMarketContext(game);
+    const soccerLiveDrama = game?.status === 'live'
+      ? Math.min(80, soccer.resultTension + soccer.latePressure + soccer.outcomeSurprise)
+      : 0;
+    return {
+      rawScore,
+      calibratedScore: calibrateGameScore(rawScore, game?.leagueId),
+      calibrationProfile: getHistoricalCalibrationProfile(game?.leagueId),
+      ...soccer,
+      liveDrama: Math.round(soccerLiveDrama),
+      finalDrama: 0,
+      baseInterest: Math.round(soccer.pregameInterest),
+      marketCompetitiveness: market.available ? market.competitivenessScore : 0,
+      marketScoringEnvironment: market.available ? market.scoringEnvironmentScore : 0,
+    };
+  }
   const market = getSportMarketContext(game); const rawScore = getRawGameScore(game); return { rawScore, calibratedScore: calibrateGameScore(rawScore, game?.leagueId), calibrationProfile: getHistoricalCalibrationProfile(game?.leagueId), personalRelevance: Math.round(importance(game)), liveDrama: Math.round(liveDrama(game)), finalDrama: Math.round(finalDrama(game)), baseInterest: Math.round(baseInterest(game)), marketExcitement: market.available ? Math.round(market.contribution) : 0, marketCompetitiveness: market.available ? market.competitivenessScore : 0, marketScoringEnvironment: market.available ? market.scoringEnvironmentScore : 0, scoringPace: Math.round(scoringPaceBonus(game)), upset: Math.round(upsetBonus(game)) };
 }
