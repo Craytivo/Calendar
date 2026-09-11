@@ -108,7 +108,7 @@ async function handleLiveRequest(req, res, timeZone, today, requestStarted) {
   const startKey = dateKey(today);
   const games = [];
   const sources = [];
-  const diagnostics = { timezone: timeZone, mode: 'live', requestedLeagues: leagues, timings: { totalMs: 0, scheduleMs: 0 }, cache: { inflightDeduped: 0, staleRefreshes: 0, circuitOpen: 0 } };
+  const diagnostics = { timezone: timeZone, mode: 'live', requestedLeagues: leagues, timings: { totalMs: 0, scheduleMs: 0, standingsMs: 0 }, cache: { inflightDeduped: 0, staleRefreshes: 0, circuitOpen: 0 } };
 
   if (leagues.length) {
     const scheduleStarted = Date.now();
@@ -127,7 +127,21 @@ async function handleLiveRequest(req, res, timeZone, today, requestStarted) {
     });
   }
 
-  const uniqueGames = Array.from(new Map(games.map((game) => [game.id, game])).values()).sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+  let enrichedGames = games;
+  const standingsStarted = Date.now();
+  if (enrichedGames.some((game) => STANDINGS_LEAGUES.has(game.leagueId))) {
+    try {
+      const result = await enrichGamesWithEspnStandings(enrichedGames);
+      enrichedGames = result.games;
+      diagnostics.standingsMs = Date.now() - standingsStarted;
+      diagnostics.standings = result.diagnostics;
+    } catch (error) {
+      diagnostics.standingsMs = Date.now() - standingsStarted;
+      diagnostics.standings = [sourceRecord('espn-standings', 'ESPN standings enrichment', 'ESPN', 'error', 0, errorMessage(error))];
+    }
+  }
+
+  const uniqueGames = Array.from(new Map(enrichedGames.map((game) => [game.id, game])).values()).sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
   const hasLiveGames = uniqueGames.some((game) => game.status === 'live');
   diagnostics.timings.totalMs = Date.now() - requestStarted;
   const failedSources = sources.filter((source) => source.status === 'error');
