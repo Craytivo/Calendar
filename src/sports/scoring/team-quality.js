@@ -5,18 +5,18 @@ function normalizeRank(rank, maxRank) {
 
 function quality(team, leagueId) {
   if (!team) return null;
-  const signals = [];
 
-  if (Number.isFinite(team.winPercentage)) signals.push(team.winPercentage);
-  if (Number.isFinite(team.ranking) && team.ranking <= 25) signals.push(normalizeRank(team.ranking, 25));
-  if (Number.isFinite(team.leagueRank)) {
-    const maxRank = leagueId === 'laliga' ? 20 : 20;
-    signals.push(normalizeRank(team.leagueRank, maxRank));
+  if (Number.isFinite(team.winPercentage)) return team.winPercentage;
+  if (leagueId === 'ncaa-football' && Number.isFinite(team.ranking) && team.ranking <= 25) {
+    return normalizeRank(team.ranking, 25);
   }
-  if (Number.isFinite(team.conferenceRank)) signals.push(normalizeRank(team.conferenceRank, 15));
-
-  if (!signals.length) return null;
-  return signals.reduce((sum, value) => sum + value, 0) / signals.length;
+  if ((leagueId === 'epl' || leagueId === 'laliga') && Number.isFinite(team.leagueRank)) {
+    return normalizeRank(team.leagueRank, 20);
+  }
+  if ((leagueId === 'nba' || leagueId === 'nhl') && Number.isFinite(team.conferenceRank)) {
+    return normalizeRank(team.conferenceRank, 15);
+  }
+  return null;
 }
 
 export function scoreTeamQuality(game) {
