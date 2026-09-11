@@ -1,7 +1,8 @@
 import { teams } from './types.js';
-import { getPriorityScore, getPriorityTier, isMajorGameForPriority, isMajorUclGameForPriority } from './priority.js';
+import { getPriorityTier, isMajorGameForPriority, isMajorUclGameForPriority } from './priority.js';
 import { getWatchScore } from './watchability.js';
 import { getLiveSignalRank } from './game-intelligence.js';
+import { scoreGameV2 } from './scoring/index-v2.js';
 
 const MY_GAMES_WINDOW_DAYS = 7;
 const MY_GAMES_SECTION_LIMIT = 5;
@@ -32,12 +33,25 @@ function applyDailyMajorCap(games) {
   });
 }
 function isLive(game) { return game.status === 'live'; }
+function getV9Score(game) { return scoreGameV2(game).total; }
 function compareForDisplay(a, b) {
-  const liveDifference = Number(isLive(b)) - Number(isLive(a)); if (liveDifference !== 0) return liveDifference;
-  if (isLive(a) && isLive(b)) { const signalDifference = getLiveSignalRank(a) - getLiveSignalRank(b); if (signalDifference !== 0) return signalDifference; }
-  const priorityDifference = getPriorityTier(a) - getPriorityTier(b); if (priorityDifference !== 0) return priorityDifference;
-  const watchDifference = getWatchScore(b) - getWatchScore(a); if (watchDifference !== 0) return watchDifference;
-  const scoreDifference = getPriorityScore(b) - getPriorityScore(a); if (scoreDifference !== 0) return scoreDifference;
+  const liveDifference = Number(isLive(b)) - Number(isLive(a));
+  if (liveDifference !== 0) return liveDifference;
+
+  if (isLive(a) && isLive(b)) {
+    const signalDifference = getLiveSignalRank(a) - getLiveSignalRank(b);
+    if (signalDifference !== 0) return signalDifference;
+  }
+
+  const priorityDifference = getV9Score(b) - getV9Score(a);
+  if (priorityDifference !== 0) return priorityDifference;
+
+  const priorityTierDifference = getPriorityTier(a) - getPriorityTier(b);
+  if (priorityTierDifference !== 0) return priorityTierDifference;
+
+  const watchDifference = getWatchScore(b) - getWatchScore(a);
+  if (watchDifference !== 0) return watchDifference;
+
   return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
 }
 export function getGamesForDate(games, date) { const start = startOfDay(date); const end = addDays(start, 1); return games.filter((game) => isWithinRange(game, start, end)).sort(compareForDisplay); }
