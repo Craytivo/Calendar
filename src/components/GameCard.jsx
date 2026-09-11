@@ -6,7 +6,6 @@ import { favoriteTeamIds } from '../sports/team-identity.js';
 import { scoreGameV2 } from '../sports/scoring/index-v2.js';
 import { getGameScore, getGameScoreLevel, getGameScoreReasons } from '../sports/game-score.js';
 import { getLiveGameSignal } from '../sports/game-intelligence.js';
-import { formatScoreboardMeta } from '../sports/clock.js';
 import { TeamMark, getDisplayTeamName } from './TeamMark.jsx';
 import './GameCard.css';
 
@@ -44,9 +43,9 @@ export function GameCard({ game, compact = false, onOpen }) {
   const awayScore = scoreFor(game, 'away');
   const homeScore = scoreFor(game, 'home');
   const hasScore = (isLive || isFinal) && (awayScore != null || homeScore != null);
-  const meta = formatScoreboardMeta(game);
   const whyItMatters = getWhyItMatters(game, scoring, priorityReasons, liveSignal, gameScore);
   const lowConfidence = priorityConfidence < 0.85;
+  const gameTime = new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
   useEffect(() => {
     if (!game.id || !Number.isFinite(currentGameScore)) return;
@@ -60,9 +59,10 @@ export function GameCard({ game, compact = false, onOpen }) {
       <header className="game-card-header">
         <div className="game-card-context">
           <span className="game-card-league">{league?.shortName || game.leagueId.toUpperCase()}</span>
+          {!isLive && !isFinal && <span className="game-card-time"><Clock3 size={12} aria-hidden="true" />{gameTime}</span>}
           {isLive && <span className="game-card-status live-status"><span className="game-card-live-dot" aria-hidden="true" />LIVE</span>}
-          {!isLive && isStartingSoon && <span className="game-card-status starting-status"><Clock3 size={11} aria-hidden="true" />{statusLabel(game, true)}</span>}
-          {!isLive && !isStartingSoon && isFinal && <span className="game-card-status">FINAL</span>}
+          {isStartingSoon && !isLive && <span className="game-card-status starting-status">STARTS IN {minutesUntil(game.startTime)}M</span>}
+          {isFinal && <span className="game-card-status">FINAL</span>}
         </div>
         <div className="game-card-header-right">
           <div className="game-card-priority" title={`Priority ${priorityScore} · ${priorityTier}${lowConfidence ? ` · ${Math.round(priorityConfidence * 100)}% confidence` : ''}`} aria-label={`Priority ${priorityScore}, ${priorityTier}${lowConfidence ? `, ${Math.round(priorityConfidence * 100)}% confidence` : ''}`}>
