@@ -3,6 +3,14 @@ import { getGameScoreSnapshot } from '../game-score.js';
 import { scoreGameV2 } from '../scoring/index-v2.js';
 
 const COMPONENT_ORDER = ['competitive', 'teamQuality', 'stakes', 'narrative', 'form', 'personal'];
+const COMPONENT_CONTRIBUTION_MAX = {
+  competitive: 30,
+  teamQuality: 20,
+  stakes: 20,
+  narrative: 15,
+  form: 10,
+  personal: 5,
+};
 
 function teamView(team = {}, leagueId = '') {
   return {
@@ -28,11 +36,17 @@ function tierId(label) {
   return String(label ?? 'unknown').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-function componentView(component, fallbackMax = 0) {
+function componentView(id, component, fallbackMax = 0) {
+  const contribution = Number(component?.contribution ?? 0);
+  const contributionMax = COMPONENT_CONTRIBUTION_MAX[id] ?? 0;
   return {
     score: Number(component?.score ?? 0),
     max: Number(component?.max ?? fallbackMax),
-    contribution: Number(component?.contribution ?? 0),
+    contribution,
+    contributionMax,
+    contributionPercent: contributionMax > 0
+      ? Math.max(0, Math.min(100, Math.round((contribution / contributionMax) * 100)))
+      : 0,
     confidence: Number(component?.confidence ?? 0),
     reasons: Array.isArray(component?.reasons) ? component.reasons.filter(Boolean) : [],
   };
@@ -116,13 +130,13 @@ export function toGameViewModel(game, scoring = scoreGameV2(game)) {
       },
       confidence: Number(scoring.confidence ?? 0),
       components: {
-        competitive: componentView(components.competitive, 25),
-        teamQuality: componentView(components.teamQuality, 20),
-        stakes: componentView(components.stakes, 20),
-        narrative: componentView(components.narrative, 15),
-        form: componentView(components.form, 10),
+        competitive: componentView('competitive', components.competitive, 25),
+        teamQuality: componentView('teamQuality', components.teamQuality, 20),
+        stakes: componentView('stakes', components.stakes, 20),
+        narrative: componentView('narrative', components.narrative, 15),
+        form: componentView('form', components.form, 10),
         personal: {
-          ...componentView(components.personal, 15),
+          ...componentView('personal', components.personal, 15),
           uiContribution: Number(components.personal?.uiContribution ?? components.personal?.contribution ?? 0),
         },
       },
