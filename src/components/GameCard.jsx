@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Clock3, Star } from 'lucide-react';
 import { leagues } from '../sports/leagues.js';
-import { getPriorityScore, getPriorityReasons } from '../sports/priority.js';
+import { getPriorityReasons } from '../sports/priority.js';
 import { favoriteTeamIds } from '../sports/team-identity.js';
+import { scoreGameV2 } from '../sports/scoring/index-v2.js';
 import { getGameScore, getGameScoreLevel, getGameScoreReasons } from '../sports/game-score.js';
 import { getLiveGameSignal } from '../sports/game-intelligence.js';
 import { formatScoreboardMeta } from '../sports/clock.js';
@@ -18,16 +19,36 @@ function teamLabel(team, leagueId) { const name = getDisplayTeamName(team); cons
 function scoreFor(game, side) { const topLevel = side === 'away' ? game.awayScore : game.homeScore; if (topLevel != null) return topLevel; const teamScore = side === 'away' ? game.awayTeam?.score : game.homeTeam?.score; return teamScore != null ? teamScore : null; }
 function readPeakScore(gameId) { if (typeof window === 'undefined' || !gameId) return 0; try { const values = JSON.parse(window.localStorage.getItem(PEAK_SCORE_STORAGE_KEY) || '{}'); return Number(values[gameId]) || 0; } catch { return 0; } }
 function writePeakScore(gameId, score) { if (typeof window === 'undefined' || !gameId || !Number.isFinite(score)) return; try { const values = JSON.parse(window.localStorage.getItem(PEAK_SCORE_STORAGE_KEY) || '{}'); if (score <= (Number(values[gameId]) || 0)) return; values[gameId] = score; window.localStorage.setItem(PEAK_SCORE_STORAGE_KEY, JSON.stringify(values)); } catch { /* Non-critical persistence. */ } }
-function getWhyItMatters(game, priorityReasons, liveSignal, gameScore) {
+function getScoringReasons(scoring) {
+  const breakdown = scoring?.breakdown || {};
+  return [
+    ...(breakdown.stakes?.reasons || []),
+    ...(breakdown.narrative?.reasons || []),
+    ...(breakdown.personal?.reasons || []),
+    ...(breakdown.competitive?.reasons || []),
+    ...(breakdown.teamQuality?.reasons || []),
+    ...(breakdown.form?.reasons || []),
+  ].filter(Boolean).filter((reason, index, reasons) => reasons.indexOf(reason) === index);
+}
+function getWhyItMatters(game, scoring, priorityReasons, liveSignal, gameScore) {
+  const modelReasons = getScoringReasons(scoring);
   const scoreReasons = getGameScoreReasons(game);
-  const primary = scoreReasons[0] || liveSignal?.reason || priorityReasons[0] || (game.isMajorEvent ? 'Major event' : null);
-  const secondary = scoreReasons.find((reason) => reason !== primary) || priorityReasons.find((reason) => reason !== primary) || (gameScore >= 75 ? 'High Game Score' : null);
+  const primary = game.status === 'live' ? (scoreReasons[0] || liveSignal?.reason) : modelReasons[0];
+  const secondaryPool = game.status === 'live'
+    ? [...scoreReasons, ...modelReasons, ...priorityReasons]
+    : [...modelReasons, ...priorityReasons, ...scoreReasons];
+  const secondary = secondaryPool.find((reason) => reason && reason !== primary) || (gameScore >= 75 ? 'High Game Score' : null);
   return [primary, secondary].filter(Boolean).slice(0, 2);
 }
 
 export function GameCard({ game, compact = false, onOpen }) {
   const league = leagues.find((item) => item.id === game.leagueId);
-  const priorityScore = getPriorityScore(game);
+  const scoring = scoreGameV2(game);
+  const priorityScore = scoring.total;
+  const priorityTier = scoring.tier;
+  const priorityConfidence = scoring.confidence;
+  const rawPriorityScore = scoring.rawTotal;
+  const confidenceAdjustedPriority = scoring.confidenceAdjustedTotal;
   const currentGameScore = getGameScore(game);
   const [peakScore, setPeakScore] = useState(() => readPeakScore(game.id));
   const gameScore = getGameScore(game, { peakScore });
@@ -44,7 +65,8 @@ export function GameCard({ game, compact = false, onOpen }) {
   const homeScore = scoreFor(game, 'home');
   const hasScore = (isLive || isFinal) && (awayScore != null || homeScore != null);
   const meta = formatScoreboardMeta(game);
-  const whyItMatters = getWhyItMatters(game, priorityReasons, liveSignal, gameScore);
+  const whyItMatters = getWhyItMatters(game, scoring, priorityReasons, liveSignal, gameScore);
+  const lowConfidence = priorityConfidence < 0.85;
 
   useEffect(() => {
     if (!game.id || !Number.isFinite(currentGameScore)) return;
@@ -54,11 +76,12 @@ export function GameCard({ game, compact = false, onOpen }) {
   }, [game.id, currentGameScore, peakScore]);
 
   return (
-    <button type="button" className={`game-card ${compact ? 'compact' : ''} ${isLive ? 'live' : ''} ${isFinal ? 'final' : ''} ${isStartingSoon ? 'starting-soon' : ''} ${isFavorite ? 'favorite-team-card' : ''} score-${gameScoreLevel.toLowerCase()} accent-${game.leagueId === 'nba' || game.leagueId === 'epl' || game.leagueId === 'ucl' ? 'blue' : game.leagueId === 'mlb' || game.leagueId === 'ncaa-football' ? 'green' : game.leagueId === 'nhl' || game.leagueId === 'laliga' ? 'red' : 'neutral'}`} onClick={() => onOpen?.(game)} aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}, Game Score ${gameScore}`} data-priority-score={priorityScore} data-game-score={gameScore}>
+    <button type="button" className={`game-card ${compact ? 'compact' : ''} ${isLive ? 'live' : ''} ${isFinal ? 'final' : ''} ${isStartingSoon ? 'starting-soon' : ''} ${isFavorite ? 'favorite-team-card' : ''} score-${gameScoreLevel.toLowerCase()} accent-${game.leagueId === 'nba' || game.leagueId === 'epl' || game.leagueId === 'ucl' ? 'blue' : game.leagueId === 'mlb' || game.leagueId === 'ncaa-football' ? 'green' : game.leagueId === 'nhl' || game.leagueId === 'laliga' ? 'red' : 'neutral'}`} onClick={() => onOpen?.(game)} aria-label={`View details for ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}, Priority ${priorityScore}, ${priorityTier}`} data-priority-score={priorityScore} data-score={priorityScore} data-raw-score={rawPriorityScore} data-confidence-adjusted-score={confidenceAdjustedPriority} data-confidence={priorityConfidence} data-score-tier={priorityTier} data-game-score={gameScore}>
       <header className="game-card-header">
         <span className="game-card-league">{league?.shortName || game.leagueId.toUpperCase()}</span>
         <div className="game-card-header-meta">
-          <span className="game-card-score" title={`Game Score ${gameScore} · ${gameScoreLevel}`} aria-label={`Game Score ${gameScore}, ${gameScoreLevel}`}><strong>{gameScore}</strong><small>Score</small></span>
+          <span className="game-card-score" title={`Priority ${priorityScore} · ${priorityTier}${lowConfidence ? ` · ${Math.round(priorityConfidence * 100)}% confidence` : ''}`} aria-label={`Priority ${priorityScore}, ${priorityTier}${lowConfidence ? `, ${Math.round(priorityConfidence * 100)}% confidence` : ''}`}><strong>{priorityScore}</strong><small>Priority</small></span>
+          {isLive && <span className="game-card-score game-card-live-score" title={`Live Game Score ${gameScore} · ${gameScoreLevel}`} aria-label={`Live Game Score ${gameScore}, ${gameScoreLevel}`}><strong>{gameScore}</strong><small>Live</small></span>}
           {isStartingSoon && !isLive && <Clock3 size={12} aria-hidden="true" />}
           {isLive && <span className="game-card-live-dot" aria-hidden="true" />}
           <span className="game-card-time">{statusLabel(game, isStartingSoon)}</span>
