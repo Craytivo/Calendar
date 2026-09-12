@@ -51,6 +51,7 @@ export function GameCard({ game, compact = false, onOpen }) {
   const dominantComponent = explanation.dominantComponent;
   const dominantLabel = dominantComponent ? COMPONENT_LABELS[dominantComponent] : null;
   const confidence = Math.round(v2.confidence * 100);
+  const calculatedScoreLabel = isLive ? 'LIVE CALCULATED SCORE' : isFinal ? 'FINAL CALCULATED SCORE' : 'GAMESCORE';
 
   return (
     <button
@@ -58,7 +59,7 @@ export function GameCard({ game, compact = false, onOpen }) {
       className={`game-card ${compact ? 'compact' : ''} ${isLive ? 'live' : ''} ${isFinal ? 'final' : ''} ${isStartingSoon ? 'starting-soon' : ''}`}
       onClick={() => onOpen?.(game)}
       aria-label={isLive || isFinal
-        ? `${isLive ? 'Live' : 'Final'} score: ${getDisplayTeamName(away)} ${live?.awayScore ?? '—'}, ${getDisplayTeamName(home)} ${live?.homeScore ?? '—'}`
+        ? `${isLive ? 'Live' : 'Final'} score: ${getDisplayTeamName(away)} ${live?.awayScore ?? '—'}, ${getDisplayTeamName(home)} ${live?.homeScore ?? '—'}. ${calculatedScoreLabel} ${v2.total}.`
         : `View ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}. GameScore ${v2.total}, ${v2.tier.label}.`}
       data-game-id={identity.gameId}
       data-priority-score={v2.total}
@@ -79,34 +80,32 @@ export function GameCard({ game, compact = false, onOpen }) {
         </div>
       </header>
 
-      {!isLive && !isFinal && (
-        <section className="game-card-score-row" aria-label={`GameScore ${v2.total}, ${v2.tier.label}`}>
-          <div className="game-card-score">
-            <strong>{v2.total}</strong>
-            <span>GAMESCORE</span>
-          </div>
-          <div className="game-card-tier">
-            <span className="game-card-tier-label">{v2.tier.label}</span>
-            {dominantLabel && <span className="game-card-dominant">Driven by {dominantLabel.toLowerCase()}</span>}
-          </div>
-          <div className="game-card-confidence" title={`${confidenceLabel(v2.confidence)} · ${confidence}%`}>
-            <span>DATA</span>
-            <strong>{confidence}%</strong>
-          </div>
-        </section>
-      )}
-
       <section className={`game-card-matchup ${hasScore ? 'has-score' : ''}`}>
         <div className={`game-card-team ${isFinal && awayScoreWins(live?.awayScore, live?.homeScore) ? 'winner' : ''}`}>
           <TeamMark team={away} size={compact ? 'medium' : 'large'} />
           <span>{teamLabel(away)}</span>
-          {hasScore && <strong>{live.awayScore}</strong>}
+          {hasScore && <strong>{live?.awayScore ?? '—'}</strong>}
         </div>
         <div className="game-card-at">@</div>
         <div className={`game-card-team ${isFinal && homeScoreWins(live?.awayScore, live?.homeScore) ? 'winner' : ''}`}>
           <TeamMark team={home} size={compact ? 'medium' : 'large'} />
           <span>{teamLabel(home)}</span>
-          {hasScore && <strong>{live.homeScore}</strong>}
+          {hasScore && <strong>{live?.homeScore ?? '—'}</strong>}
+        </div>
+      </section>
+
+      <section className={`game-card-score-row ${isLive ? 'live-calculated' : ''} ${isFinal ? 'final-calculated' : ''}`} aria-label={`${calculatedScoreLabel} ${v2.total}`}>
+        <div className="game-card-score">
+          <strong>{v2.total}</strong>
+          <span>{calculatedScoreLabel}</span>
+        </div>
+        <div className="game-card-tier">
+          <span className="game-card-tier-label">{v2.tier.label}</span>
+          {dominantLabel && <span className="game-card-dominant">Driven by {dominantLabel.toLowerCase()}</span>}
+        </div>
+        <div className="game-card-confidence" title={`${confidenceLabel(v2.confidence)} · ${confidence}%`}>
+          <span>DATA</span>
+          <strong>{confidence}%</strong>
         </div>
       </section>
 
