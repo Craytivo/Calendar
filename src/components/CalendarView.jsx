@@ -3,7 +3,6 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { GameCard } from './GameCard.jsx';
 import { IntelligentDaySummary } from './IntelligentDaySummary.jsx';
 import './CalendarView.css';
-import './IntelligentDaySummary.css';
 
 const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const PRIORITY_TIERS = new Set(['must-watch', 'excellent', 'strong', 'worth-watching']);
