@@ -1,5 +1,0 @@
-.next-up{margin:0 0 22px;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface);box-shadow:var(--shadow-md)}
-.next-up-header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border-soft)}
-.next-up-header h2{margin:4px 0 0;color:var(--text);font-family:'Manrope';font-size:19px;line-height:1.08;letter-spacing:-.045em}
-.next-up-countdown{color:var(--text-secondary);font-size:8px;font-weight:850;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;font-variant-numeric:tabular-nums}.next-up-card .game-card{width:100%;background:var(--surface);box-shadow:none}.next-up-card .game-card:hover{transform:none;box-shadow:none;border-color:var(--border)}
-@media(max-width:760px){.next-up{padding:13px;border-radius:13px;margin-bottom:18px}.next-up-header{align-items:flex-start;gap:10px}.next-up-header h2{font-size:18px}.next-up-countdown{padding-top:2px;font-size:8px}}
