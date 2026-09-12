@@ -1,5 +1,6 @@
 import { fetchEspnLeagueWindow as fetchSchedule, fetchEspnTeamWindow as fetchTeamSchedule, favoriteTeamIds } from './espn-schedules.js';
 import { fetchEspnEventOdds } from './odds.js';
+import { enrichNcaaLeagueGames } from './ncaa-standings-enrichment.js';
 
 const CONFIG = {
   nfl: { sport: 'football', league: 'nfl' },
@@ -58,12 +59,18 @@ async function enrich(games) {
   return Array.from(output.values());
 }
 
+async function enrichSchedule(games) {
+  return enrichNcaaLeagueGames(games);
+}
+
 export async function fetchEspnLeagueWindow(leagueId, startDate, days = 7) {
-  return enrich(await fetchSchedule(leagueId, startDate, days));
+  const games = await fetchSchedule(leagueId, startDate, days);
+  return enrich(await enrichSchedule(games));
 }
 
 export async function fetchEspnTeamWindow(teamId, startDate, days = 7) {
-  return enrich(await fetchTeamSchedule(teamId, startDate, days));
+  const games = await fetchTeamSchedule(teamId, startDate, days);
+  return enrich(await enrichSchedule(games));
 }
 
 export { favoriteTeamIds };
