@@ -1,7 +1,7 @@
 import React from 'react';
-import { Clock3, Star, ChevronRight, Activity } from 'lucide-react';
-import { TeamMark, getDisplayTeamName } from './TeamMark.jsx';
+import { Clock3, Star, ChevronRight } from 'lucide-react';
 import './GameCard.css';
+import { TeamMark, getDisplayTeamName } from './TeamMark.jsx';
 
 function minutesUntil(startTime) {
   return Math.max(0, Math.ceil((new Date(startTime).getTime() - Date.now()) / 60000));
@@ -29,10 +29,6 @@ const COMPONENT_LABELS = {
   personal: 'Personal',
 };
 
-function scoreValue(value) {
-  return value ?? '—';
-}
-
 export function GameCard({ game, compact = false, onOpen }) {
   const { identity, schedule, league, teams, status, v2, explanation, live } = game;
   const isLive = status.state === 'live';
@@ -44,10 +40,7 @@ export function GameCard({ game, compact = false, onOpen }) {
   const isFavorite = v2.components.personal.score > 0;
   const away = teams.away;
   const home = teams.home;
-  const hasLiveScore = (isLive || isFinal)
-    && (live?.awayScore != null || live?.homeScore != null);
-  const awayScore = scoreValue(live?.awayScore);
-  const homeScore = scoreValue(live?.homeScore);
+  const hasScore = (isLive || isFinal) && (live?.awayScore != null || live?.homeScore != null);
   const period = live?.period ?? live?.periodLabel ?? live?.level;
   const clock = live?.clock ?? live?.displayClock;
   const liveDetail = [period, clock].filter(Boolean).join(' · ');
@@ -65,7 +58,7 @@ export function GameCard({ game, compact = false, onOpen }) {
       className={`game-card ${compact ? 'compact' : ''} ${isLive ? 'live' : ''} ${isFinal ? 'final' : ''} ${isStartingSoon ? 'starting-soon' : ''}`}
       onClick={() => onOpen?.(game)}
       aria-label={isLive || isFinal
-        ? `${isLive ? 'Live' : 'Final'} score: ${getDisplayTeamName(away)} ${awayScore}, ${getDisplayTeamName(home)} ${homeScore}`
+        ? `${isLive ? 'Live' : 'Final'} score: ${getDisplayTeamName(away)} ${live?.awayScore ?? '—'}, ${getDisplayTeamName(home)} ${live?.homeScore ?? '—'}`
         : `View ${getDisplayTeamName(away)} at ${getDisplayTeamName(home)}. GameScore ${v2.total}, ${v2.tier.label}.`}
       data-game-id={identity.gameId}
       data-priority-score={v2.total}
@@ -86,51 +79,34 @@ export function GameCard({ game, compact = false, onOpen }) {
         </div>
       </header>
 
-      <section className={`game-card-score-row ${isLive || isFinal ? 'game-card-live-score-row' : ''}`} aria-label={isLive || isFinal ? `${isLive ? 'Live' : 'Final'} score` : `GameScore ${v2.total}, ${v2.tier.label}`}>
-        {isLive || isFinal ? (
-          <>
-            <div className="game-card-score live-score-value">
-              <strong>{awayScore}</strong>
-              <span>{getDisplayTeamName(away)}</span>
-            </div>
-            <div className="game-card-tier live-score-divider">
-              {isLive && <span className="game-card-live-label"><Activity size={12} aria-hidden="true" /> LIVE SCORE</span>}
-              {isFinal && <span className="game-card-live-label">FINAL SCORE</span>}
-            </div>
-            <div className="game-card-score live-score-value live-score-home">
-              <strong>{homeScore}</strong>
-              <span>{getDisplayTeamName(home)}</span>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="game-card-score">
-              <strong>{v2.total}</strong>
-              <span>GAMESCORE</span>
-            </div>
-            <div className="game-card-tier">
-              <span className="game-card-tier-label">{v2.tier.label}</span>
-              {dominantLabel && <span className="game-card-dominant">Driven by {dominantLabel.toLowerCase()}</span>}
-            </div>
-            <div className="game-card-confidence" title={`${confidenceLabel(v2.confidence)} · ${confidence}%`}>
-              <span>DATA</span>
-              <strong>{confidence}%</strong>
-            </div>
-          </>
-        )}
-      </section>
+      {!isLive && !isFinal && (
+        <section className="game-card-score-row" aria-label={`GameScore ${v2.total}, ${v2.tier.label}`}>
+          <div className="game-card-score">
+            <strong>{v2.total}</strong>
+            <span>GAMESCORE</span>
+          </div>
+          <div className="game-card-tier">
+            <span className="game-card-tier-label">{v2.tier.label}</span>
+            {dominantLabel && <span className="game-card-dominant">Driven by {dominantLabel.toLowerCase()}</span>}
+          </div>
+          <div className="game-card-confidence" title={`${confidenceLabel(v2.confidence)} · ${confidence}%`}>
+            <span>DATA</span>
+            <strong>{confidence}%</strong>
+          </div>
+        </section>
+      )}
 
-      <section className={`game-card-matchup ${hasLiveScore ? 'has-score' : ''}`}>
+      <section className={`game-card-matchup ${hasScore ? 'has-score' : ''}`}>
         <div className={`game-card-team ${isFinal && awayScoreWins(live?.awayScore, live?.homeScore) ? 'winner' : ''}`}>
           <TeamMark team={away} size={compact ? 'medium' : 'large'} />
           <span>{teamLabel(away)}</span>
-          {hasLiveScore && <strong>{awayScore}</strong>}
+          {hasScore && <strong>{live.awayScore}</strong>}
         </div>
         <div className="game-card-at">@</div>
         <div className={`game-card-team ${isFinal && homeScoreWins(live?.awayScore, live?.homeScore) ? 'winner' : ''}`}>
           <TeamMark team={home} size={compact ? 'medium' : 'large'} />
           <span>{teamLabel(home)}</span>
-          {hasLiveScore && <strong>{homeScore}</strong>}
+          {hasScore && <strong>{live.homeScore}</strong>}
         </div>
       </section>
 
