@@ -74,8 +74,76 @@ function scoreMlb(game) {
   };
 }
 
+function ncaafRank(team) {
+  return normalizeRank(team?.ranking ?? team?.rank ?? team?.apRanking ?? team?.pollRanking, 25);
+}
+
+function ncaafWinPct(team) {
+  return Number.isFinite(team?.winPercentage) ? clamp(team.winPercentage) : null;
+}
+
+function ncaafStrength(team) {
+  const signals = [];
+  const rank = ncaafRank(team);
+  if (rank !== null) signals.push([rank, 0.55]);
+  const winPct = ncaafWinPct(team);
+  if (winPct !== null) signals.push([winPct, rank === null ? 0.85 : 0.35]);
+  if (!signals.length) return null;
+  const weight = signals.reduce((sum, [, signalWeight]) => sum + signalWeight, 0);
+  return signals.reduce((sum, [value, signalWeight]) => sum + value * signalWeight, 0) / weight;
+}
+
+function ncaafSpreadCompetitiveness(game) {
+  const spread = Number(game?.odds?.spread ?? game?.bettingOdds?.spread ?? game?.market?.spread);
+  if (!Number.isFinite(spread)) return null;
+  const absoluteSpread = Math.abs(spread);
+  return clamp(1 - absoluteSpread / 28);
+}
+
+function scoreNcaaf(game) {
+  const home = ncaafStrength(game.homeTeam);
+  const away = ncaafStrength(game.awayTeam);
+  const strengths = [home, away].filter((value) => value !== null);
+
+  if (strengths.length === 0) {
+    return { score: 6, max: 25, confidence: 0.2, reasons: ['Limited NCAA team-strength data'] };
+  }
+
+  const quality = strengths.reduce((sum, value) => sum + value, 0) / strengths.length;
+  const balance = strengths.length === 2 ? 1 - Math.abs(home - away) : 0.45;
+  const spread = ncaafSpreadCompetitiveness(game);
+  const rankedHome = ncaafRank(game.homeTeam);
+  const rankedAway = ncaafRank(game.awayTeam);
+  const rankedCount = [rankedHome, rankedAway].filter((value) => value !== null).length;
+
+  let competitive = 0.45 * balance + 0.30 * quality;
+  if (spread !== null) competitive = competitive * 0.70 + spread * 0.30;
+  if (rankedCount === 2 && balance >= 0.80) competitive += 0.10;
+  competitive = clamp(competitive);
+
+  const score = Math.round(25 * competitive);
+  const dataFields = [home, away, spread].filter((value) => value !== null).length;
+  const confidenceValue = Math.min(0.95, 0.25 + dataFields * 0.20);
+  const reasons = [];
+
+  if (rankedCount === 2) reasons.push('Ranked-vs-ranked');
+  else if (rankedCount === 1) reasons.push('Ranked team involved');
+  if (balance >= 0.90) reasons.push('Very evenly matched');
+  else if (balance >= 0.78) reasons.push('Competitive matchup');
+  if (quality >= 0.80) reasons.push('High-quality teams');
+  if (spread !== null && spread >= 0.75) reasons.push('Close projected game');
+
+  return {
+    score: Math.max(0, Math.min(25, score)),
+    max: 25,
+    confidence: confidenceValue,
+    reasons: reasons.slice(0, 3),
+  };
+}
+
 export function scoreCompetitiveV2(game) {
   if (game.leagueId === 'mlb') return scoreMlb(game);
+  if (game.leagueId === 'ncaa-football') return scoreNcaaf(game);
 
   const strength = (team) => Number.isFinite(team?.winPercentage) ? team.winPercentage : null;
   const home = strength(game.homeTeam);
